@@ -30,7 +30,7 @@ Important quick guide steps:
 * Install [Visual Studio Community 2019](https://visualstudio.microsoft.com/vs/)
 * Install [Visual Studio Code](https://code.visualstudio.com/download)
 * Install [C/C++ for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
-* Launch a [Developer Command Prompt for VS2019]([Developer Command Prompt](https://docs.microsoft.com/en-us/dotnet/framework/tools/developer-command-prompt-for-vs)
+* Launch a [Developer Command Prompt for VS2019](https://docs.microsoft.com/en-us/dotnet/framework/tools/developer-command-prompt-for-vs)
 * `cd E:\sources\zax-compiler` (change as appropriate)
 * Launch Visual Studio Code from the prompt `code .`
 * Select `Terminal->Run Build Task...`  (some option choice may be prompted)
