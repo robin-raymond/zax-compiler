@@ -1,0 +1,67 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "setup",
+			"command": "${workspaceFolder}/.vscode/setup.bat",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"presentation": {
+				"reveal": "never"
+			}
+		},
+		{
+			"type": "shell",
+			"label": "Build - out/x64/debug",
+			"command": "cl.exe",
+			"args": [
+				"/JMC",
+				"/Zc:wchar_t",
+				"/permissive-",
+				"/std:c++latest",
+				"/Zc:forScope",
+				"/Zc:inline",
+				"/Zi",
+				"/EHsc",
+				"/GS",
+				"/Gd",
+				"/RTC1",
+				"/fp:precise",
+				"/MDd",
+				"/W3",
+				"/FC",
+				"/nologo",
+				"/Fa\"${workspaceFolder}/out/x64/\"",
+				"/Fo\"${workspaceFolder}/out/x64/\"",
+				"/D \"_DEBUG\"",
+				"/D \"_CONSOLE\"",
+				"/D \"_UNICODE\"",
+				"/D \"UNICODE\"",
+				"/I\"${workspaceFolder}/src\"",
+				"/I\"${workspaceFolder}/../json/include\"",
+				"/I\"${workspaceFolder}/..\"",
+				"/I\"${workspaceFolder}/../GSL/include\"",
+				"${workspaceFolder}/src/*.cpp",
+				"/Fe:",
+				"${workspaceFolder}/out/x64/debug/zax.exe",
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/out/x64/debug"
+			},
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"dependsOn": ["setup"]
+		}
+		
+	]
+}
