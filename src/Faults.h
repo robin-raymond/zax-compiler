@@ -33,6 +33,7 @@ struct Faults
   {
     if (stack_.size() < 1)
       return false;
+
     stack_.pop();
     return true;
   }

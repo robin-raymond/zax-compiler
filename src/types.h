@@ -20,14 +20,18 @@ using Puid = unsigned int;
 template <typename T>
 using optional = std::optional<T>;
 
+ZAX_DECLARE_STRUCT_PTR(CodeBlock);
 ZAX_DECLARE_STRUCT_PTR(Compiler);
 ZAX_DECLARE_STRUCT_PTR(CompileState);
 ZAX_DECLARE_STRUCT_PTR(Config);
+ZAX_DECLARE_STRUCT_PTR(Context);
 ZAX_DECLARE_STRUCT_PTR(Module);
 ZAX_DECLARE_STRUCT_PTR(Source);
 ZAX_DECLARE_STRUCT_PTR(SourceFilePath);
 ZAX_DECLARE_STRUCT_PTR(SourceLocation);
 ZAX_DECLARE_STRUCT_PTR(Token);
+ZAX_DECLARE_STRUCT_PTR(TypeAlias);
+ZAX_DECLARE_STRUCT_PTR(TypeDefine);
 ZAX_DECLARE_STRUCT_PTR(Tokenizer);
 
 } // namespace zax

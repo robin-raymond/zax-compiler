@@ -8,7 +8,8 @@ namespace zax
 
 struct Config
 {
-  Text source_;
+  Text sourceFilePath_;
+  Text outputPath_;
 };
 
 } // namespace zax

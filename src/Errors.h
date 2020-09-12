@@ -49,10 +49,11 @@ struct ErrorsTypes
     MissingEndOfComments,
     CompilesDirectiveError,
     RequiresDirectiveError,
-    ValueNotCaptured
+    ValueNotCaptured,
+    UnmatchedPush
   };
 
-  struct ErrorDeclare final : public zs::EnumDeclare<Error, 39>
+  struct ErrorDeclare final : public zs::EnumDeclare<Error, 40>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -95,7 +96,8 @@ struct ErrorsTypes
         {Error::MissingEndOfComments, "missing-end-of-comments"},
         {Error::CompilesDirectiveError, "compiles-directive-error"},
         {Error::RequiresDirectiveError, "requires-directive-error"},
-        {Error::ValueNotCaptured, "value-not-captured"}
+        {Error::ValueNotCaptured, "value-not-captured"},
+        {Error::UnmatchedPush, "unmatched-push"}
       } };
     }
   };

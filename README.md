@@ -15,6 +15,7 @@ The first goal is to make the code function without concerning too much about pe
 The following dependencies are required:
 * [nlohmann/json](https://github.com/nlohmann/json)
 * [Microsoft GSL](https://github.com/microsoft/GSL)
+* [SafeInt](https://github.com/dcleblanc/SafeInt)
 * [zs](https://github.com/robin-raymond/zs)
 
 These dependencies are expected to be cloned within the same containing folder that already contains [Zax Compiler](https://github.com/robin-raymond/zax-compiler).
@@ -22,7 +23,7 @@ These dependencies are expected to be cloned within the same containing folder t
 
 ## Building
 
-Currently only the Microsoft Visual Studio Compiler is supported and the editor / Compiler using Visual Studio Code with the C/C++ for [Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools).
+Currently only the Microsoft Visual Studio Compiler is supported and the editor / compiler using Visual Studio Code with the C/C++ for [Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools). The code is designed cross platform thus other compiler options can be made available.
 
 See [https://code.visualstudio.com/docs/languages/cpp](https://code.visualstudio.com/docs/languages/cpp).
 

@@ -30,4 +30,7 @@
 #include <nlohmann/json.hpp>
 #pragma warning(pop)
 
+#include <SafeInt/SafeInt.hpp>
+
 #include <zs/enum.h>
+#include <zs/AutoScope.h>
