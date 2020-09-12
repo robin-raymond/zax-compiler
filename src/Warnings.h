@@ -49,10 +49,11 @@ struct WarningTypes
     ExportDisabledFromExportNever,
     RedundantAccessViaSelf,
     RedundantAccessViaOwn,
-    BadStyle
+    BadStyle,
+    DescopeDirectiveRequired
   };
 
-  struct WarningDeclare final : public zs::EnumDeclare<Warning, 39>
+  struct WarningDeclare final : public zs::EnumDeclare<Warning, 40>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -95,7 +96,8 @@ struct WarningTypes
         {Warning::ExportDisabledFromExportNever, "export-disabled-from-export-never"},
         {Warning::RedundantAccessViaSelf, "redundant-access-via-self"},
         {Warning::RedundantAccessViaOwn, "redundant-access-via-own"},
-        {Warning::BadStyle, "bad-style"}
+        {Warning::BadStyle, "bad-style"},
+        {Warning::DescopeDirectiveRequired, "descope-directive-required"}
       } };
     }
   };

@@ -45,15 +45,18 @@ struct ErrorsTypes
     LineDirectiveWithoutFile,
     BadAlignment,
     DuplicateCase,
+    DuplicateSymbol,
     ConditionExpectsBoolean,
     MissingEndOfComments,
     CompilesDirectiveError,
     RequiresDirectiveError,
     ValueNotCaptured,
-    UnmatchedPush
+    UnmatchedPush,
+    ScopeFlowControlSkipsDeclaration,
+    InlineFunctionNotFinal
   };
 
-  struct ErrorDeclare final : public zs::EnumDeclare<Error, 40>
+  struct ErrorDeclare final : public zs::EnumDeclare<Error, 43>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -92,12 +95,15 @@ struct ErrorsTypes
         {Error::LineDirectiveWithoutFile, "line-directive-without-file"},
         {Error::BadAlignment, "bad-alignment"},
         {Error::DuplicateCase, "duplicate-case"},
+        {Error::DuplicateSymbol, "duplicate-symbol"},
         {Error::ConditionExpectsBoolean, "condition-expects-boolean"},
         {Error::MissingEndOfComments, "missing-end-of-comments"},
         {Error::CompilesDirectiveError, "compiles-directive-error"},
         {Error::RequiresDirectiveError, "requires-directive-error"},
         {Error::ValueNotCaptured, "value-not-captured"},
-        {Error::UnmatchedPush, "unmatched-push"}
+        {Error::UnmatchedPush, "unmatched-push"},
+        {Error::ScopeFlowControlSkipsDeclaration, "scope-flow-control-skips-declaration"},
+        {Error::InlineFunctionNotFinal, "inline-function-not-final"}
       } };
     }
   };
