@@ -4,6 +4,7 @@
             "name": "x86 - Debug",
             "includePath": [
                 "${workspaceFolder}/src/**",
+                "${workspaceFolder}/test/**",
                 "${workspaceFolder}/../json/include",
                 "${workspaceFolder}/../GSL/include",
                 "${workspaceFolder}/.."

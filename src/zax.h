@@ -5,6 +5,7 @@
 #include "Errors.h"
 #include "helpers.h"
 #include "Module.h"
+#include "OperatorLut.h"
 #include "Panics.h"
 #include "Source.h"
 #include "SourceFilePath.h"

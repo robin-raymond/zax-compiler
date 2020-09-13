@@ -47,6 +47,7 @@
 				"/I\"${workspaceFolder}/..\"",
 				"/I\"${workspaceFolder}/../GSL/include\"",
 				"${workspaceFolder}/src/*.cpp",
+				"${workspaceFolder}/test/*.cpp",
 				"/Fe:",
 				"${workspaceFolder}/out/x64/debug/zax.exe",
 			],

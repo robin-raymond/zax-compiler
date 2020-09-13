@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\helpers.cpp" />
+    <ClCompile Include="..\..\..\src\OperatorLut.cpp" />
     <ClCompile Include="..\..\..\src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -27,7 +28,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Token.cpp" />
+    <ClCompile Include="..\..\..\src\Tokenizer.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
+    <ClCompile Include="..\..\..\test\test_common.cpp" />
+    <ClCompile Include="..\..\..\test\test_OperatorLut.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Compiler.h" />
@@ -38,6 +42,7 @@
     <ClInclude Include="..\..\..\src\Faults.h" />
     <ClInclude Include="..\..\..\src\helpers.h" />
     <ClInclude Include="..\..\..\src\Module.h" />
+    <ClInclude Include="..\..\..\src\OperatorLut.h" />
     <ClInclude Include="..\..\..\src\Panics.h" />
     <ClInclude Include="..\..\..\src\pch.h" />
     <ClInclude Include="..\..\..\src\Source.h" />
@@ -48,6 +53,7 @@
     <ClInclude Include="..\..\..\src\types.h" />
     <ClInclude Include="..\..\..\src\Warnings.h" />
     <ClInclude Include="..\..\..\src\zax.h" />
+    <ClInclude Include="..\..\..\test\common.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\.gitignore">
@@ -142,7 +148,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -160,7 +166,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -178,7 +184,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -196,7 +202,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\src;$(ProjectDir)..\..\..\..\json\include;$(ProjectDir)..\..\..\..;$(ProjectDir)..\..\..\..\GSL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

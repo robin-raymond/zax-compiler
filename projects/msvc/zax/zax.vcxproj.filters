@@ -4,6 +4,9 @@
     <Filter Include="src">
       <UniqueIdentifier>{e9dec1a7-6097-4934-bb01-a21b9ea1dbc3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{06589c07-c71d-43fc-9282-a79108182c02}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\zax.cpp">
@@ -17,6 +20,18 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Token.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Tokenizer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\OperatorLut.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\test\test_common.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\test\test_OperatorLut.cpp">
+      <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -73,6 +88,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\zax.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\OperatorLut.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\test\common.h">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
