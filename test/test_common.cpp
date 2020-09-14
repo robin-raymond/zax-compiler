@@ -78,7 +78,7 @@ void zaxTest::actualCheck(
 }
 
 //-----------------------------------------------------------------------------
-void zaxTest::output(std::string_view testName) noexcept
+void zaxTest::output(StringView testName) noexcept
 {
   auto passed = Testing::passed();
   auto failed = Testing::failed();
@@ -95,6 +95,7 @@ int runAllTests() noexcept
 {
   try {
     testOperatorLut();
+    testTokenizer();
   }
   catch (...) {
     std::cout << "ERROR: uncaught exception thrown!\n";

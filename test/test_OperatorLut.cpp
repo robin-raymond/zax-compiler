@@ -6,10 +6,6 @@
 #include "../src/OperatorLut.h"
 
 
-#if 0
-using namespace std::string_view_literals;
-#endif //0
-
 namespace zaxTest
 {
 
@@ -27,18 +23,14 @@ struct OperatorLutBasics
   //-------------------------------------------------------------------------
   void test() noexcept(false)
   {
-    std::atomic_int value{};
-
-    TEST(0 == 0);
-
     zax::OperatorLut lut;
 
-    auto expectNoResult{ [&](std::string_view str) noexcept(false) {
+    auto expectNoResult{ [&](StringView str) noexcept(false) {
       auto result{ lut.lookup(str) };
       TEST(!result.has_value());
     } };
 
-    auto expectSingleResult{ [&](std::string_view str, zax::TokenTypes::Operator expecting) noexcept(false) {
+    auto expectSingleResult{ [&](StringView str, zax::TokenTypes::Operator expecting) noexcept(false) {
       auto result{ lut.lookup(str) };
       TEST(result.has_value());
       TEST(*result == expecting);
@@ -50,7 +42,7 @@ struct OperatorLutBasics
       TEST(prefix == str.substr(0, prefix.length()));
     } };
 
-    auto expectMultipleResults{ [&](std::string_view str, const std::set<zax::TokenTypes::Operator>& expecting) noexcept(false) {
+    auto expectMultipleResults{ [&](StringView str, const std::set<zax::TokenTypes::Operator>& expecting) noexcept(false) {
       auto result{ lut.lookup(str) };
       TEST(result.has_value());
       TEST(end(expecting) != expecting.find(*result));
@@ -79,7 +71,7 @@ struct OperatorLutBasics
       }
     } };
 
-    auto expectEatTokens{ [&](std::string_view str, std::string_view remaining, const std::vector<std::string_view>& expecting) noexcept(false) {
+    auto expectEatTokens{ [&](StringView str, StringView remaining, const std::vector<StringView>& expecting) noexcept(false) {
       auto all{ expecting };
       auto parseStr{ str };
       while (parseStr.length() > 0) {
@@ -101,8 +93,8 @@ struct OperatorLutBasics
       TEST(all.size() == 0);
     } };
 
-    expectSingleResult("+= hello", zax::TokenTypes::Operator::AddAssign);
-    expectSingleResult("+=+ hello", zax::TokenTypes::Operator::AddAssign);
+    expectSingleResult("+= hello", zax::TokenTypes::Operator::PlusAssign);
+    expectSingleResult("+=+ hello", zax::TokenTypes::Operator::PlusAssign);
     expectSingleResult("+++!hello", zax::TokenTypes::Operator::Constructor);
     expectSingleResult("---+hello", zax::TokenTypes::Operator::Destructor);
     expectMultipleResults("+/hello", std::set<zax::TokenTypes::Operator>{
@@ -121,28 +113,31 @@ struct OperatorLutBasics
       zax::TokenTypes::Operator::MinusMinusPreUnary,
       zax::TokenTypes::Operator::MinusMinusPostUnary
     });
+
+    expectNoResult({});
+    expectNoResult("");
     expectNoResult("`hello`");
 
-    expectEatTokens("+++++.+", "", std::vector<std::string_view>{
+    expectEatTokens("+++++.+", "", std::vector<StringView>{
       "+++",
       "++",
       ".",
       "+"
     });
 
-    expectEatTokens("[[]]]hello", "hello", std::vector<std::string_view>{
+    expectEatTokens("[[]]]hello", "hello", std::vector<StringView>{
       "[[",
       "]]",
       "]"
     });
 
-    expectEatTokens("//*", "", std::vector<std::string_view>{
+    expectEatTokens("//*", "", std::vector<StringView>{
       "/",
       "/",
       "*"
     });
 
-    expectEatTokens("{{{]~|=fine", "fine", std::vector<std::string_view>{
+    expectEatTokens("{{{]~|=fine", "fine", std::vector<StringView>{
       "{{",
       "{",
       "]",

@@ -14,7 +14,16 @@ Puid zax::puid() noexcept {
 }
 
 //-----------------------------------------------------------------------------
-std::pair<std::unique_ptr<std::byte[]>, size_t> zax::readBinaryFile(const std::string_view fileName) noexcept
+StringView zax::makeStringView(const char* start, const char* end) noexcept {
+  if ((!start) || (!end))
+    return {};
+  assert(end >= start);
+  return StringView{ start, SafeInt<size_t>(end - start) };
+}
+
+
+//-----------------------------------------------------------------------------
+std::pair<std::unique_ptr<std::byte[]>, size_t> zax::readBinaryFile(const StringView fileName) noexcept
 {
   std::ifstream binFile;
   std::uintmax_t size{};
@@ -100,11 +109,11 @@ std::string zax::makeIncludeFile(
 
 
 //-----------------------------------------------------------------------------
-std::map<size_t, std::string_view> zax::stringSplitView(
-  const std::string_view& input,
-  const std::string_view& splitStr) noexcept
+std::map<size_t, StringView> zax::stringSplitView(
+  const StringView& input,
+  const StringView& splitStr) noexcept
 {
-  std::map<size_t, std::string_view> outResult;
+  std::map<size_t, StringView> outResult;
 
   if (input.size() < 1)
     return outResult;
@@ -121,7 +130,7 @@ std::map<size_t, std::string_view> zax::stringSplitView(
   {
     auto found = input.find(splitStr, searchFrom);
     if (std::string::npos == found) {
-      std::string_view sub = input.substr(searchFrom);
+      StringView sub = input.substr(searchFrom);
 
       if (sub.size() > 0) {
         outResult[count] = sub;
@@ -130,7 +139,7 @@ std::map<size_t, std::string_view> zax::stringSplitView(
       break;
     }
 
-    std::string_view sub = input.substr(searchFrom, found - searchFrom);
+    StringView sub = input.substr(searchFrom, found - searchFrom);
     searchFrom = found + splitStr.size();
 
     outResult[count] = sub;
@@ -143,8 +152,8 @@ std::map<size_t, std::string_view> zax::stringSplitView(
 
 //-----------------------------------------------------------------------------
 std::map<size_t, std::string> stringSplit(
-  const std::string_view& input,
-  const std::string_view& splitStr) noexcept
+  const StringView& input,
+  const StringView& splitStr) noexcept
 {
   std::map<size_t, std::string> outResult;
 
@@ -163,7 +172,7 @@ std::map<size_t, std::string> stringSplit(
   {
     auto found = input.find(splitStr, searchFrom);
     if (std::string::npos == found) {
-      std::string_view sub = input.substr(searchFrom);
+      StringView sub = input.substr(searchFrom);
 
       if (sub.size() > 0) {
         outResult[count] = sub;
@@ -172,7 +181,7 @@ std::map<size_t, std::string> stringSplit(
       break;
     }
 
-    std::string_view sub = input.substr(searchFrom, found - searchFrom);
+    StringView sub = input.substr(searchFrom, found - searchFrom);
     searchFrom = found + splitStr.size();
 
     outResult[count] = sub;
@@ -186,7 +195,7 @@ std::map<size_t, std::string> stringSplit(
 //-----------------------------------------------------------------------------
 std::string zax::stringMerge(
   const std::map<size_t, std::string>& input,
-  const std::string_view& splitStr) noexcept
+  const StringView& splitStr) noexcept
 {
   if (input.size() < 1)
     return {};
@@ -212,8 +221,8 @@ std::string zax::stringMerge(
 
 //-----------------------------------------------------------------------------
 std::string zax::stringMerge(
-  const std::map<size_t, std::string_view>& input,
-  const std::string_view& splitStr) noexcept
+  const std::map<size_t, StringView>& input,
+  const StringView& splitStr) noexcept
 {
   if (input.size() < 1)
     return {};

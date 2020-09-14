@@ -32,6 +32,7 @@
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
     <ClCompile Include="..\..\..\test\test_OperatorLut.cpp" />
+    <ClCompile Include="..\..\..\test\test_Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Compiler.h" />

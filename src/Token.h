@@ -67,7 +67,7 @@ struct TokenTypes
     And,
     Or,
     Xor,
-    AddAssign,
+    PlusAssign,
     MinusAssign,
     MultiplyAssign,
     DivideAssign,
@@ -176,7 +176,7 @@ struct TokenTypes
         { Operator::And, "&&" },
         { Operator::Or, "||" },
         { Operator::Xor, "^^" },
-        { Operator::AddAssign, "+=" },
+        { Operator::PlusAssign, "+=" },
         { Operator::MinusAssign, "-=" },
         { Operator::MultiplyAssign, "*=" },
         { Operator::DivideAssign, "/=" },
@@ -403,6 +403,9 @@ struct Token : public TokenTypes
 
   Operator operator_{};
   Keyword keyword_{};
+
+  StringView originalToken_;
+  StringView token_;
 
   SourceLocation location_;
   CompileStatePtr compileState_;

@@ -33,6 +33,9 @@
     <ClCompile Include="..\..\..\test\test_OperatorLut.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\test\test_Tokenizer.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\pch.h">

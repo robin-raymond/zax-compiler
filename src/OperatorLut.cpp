@@ -99,7 +99,7 @@ const OperatorLutTypes:: OperatorEnumSet& OperatorLut::lookupConflicts(TokenType
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenTypes::Operator> OperatorLut::lookup(const std::string_view contents) noexcept
+optional<TokenTypes::Operator> OperatorLut::lookup(const StringView contents) const noexcept
 {
   if (contents.length() < 1)
     return {};
@@ -118,7 +118,7 @@ optional<TokenTypes::Operator> OperatorLut::lookup(const std::string_view conten
   auto longest{ std::min(longestSymbol(), contents.length()) };
   
   for (; longest > 0; --longest) {
-    std::string_view str{ pos, longest };
+    StringView str{ pos, longest };
 
     if (auto foundLength{ entryMap.find(longest) }; foundLength != end(entryMap)) {
       auto& symbolVector{ foundLength->second };
@@ -135,7 +135,7 @@ optional<TokenTypes::Operator> OperatorLut::lookup(const std::string_view conten
 }
 
 //-----------------------------------------------------------------------------
-std::string_view OperatorLut::lookup(TokenTypes::Operator value) noexcept
+StringView OperatorLut::lookup(TokenTypes::Operator value) const noexcept
 {
   return operatorsLut_[TokenTypes::OperatorTraits::toUnderlying(value)];
 }

@@ -5,6 +5,8 @@
 
 namespace zaxTest
 {
+using StringView = zax::StringView;
+
 void actualCheck(
   bool value,
   const char* str,
@@ -16,8 +18,9 @@ void actualCheck(
 #define TEST(x) actualCheck(x, #x, __FILE__, __FUNCTION__, __LINE__)
 
 void testOperatorLut() noexcept(false);
+void testTokenizer() noexcept(false);
 
-void output(std::string_view testName) noexcept;
+void output(StringView testName) noexcept;
 
 inline auto now() noexcept {
   return std::chrono::system_clock::now();
