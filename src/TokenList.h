@@ -19,6 +19,8 @@ struct TokenListTypes
   using index_type = zs::index_type;
 };
 
+inline bool hasAhead(TokenListTypes::iterator pos, index_type count) noexcept { return pos.hasAhead(count); }
+inline bool hasBehind(TokenListTypes::iterator pos, index_type count) noexcept { return pos.hasBehind(count); }
 
 TokenList extract(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept;
 TokenList extract(TokenListTypes::iterator first, index_type count) noexcept;
@@ -81,6 +83,8 @@ struct TokenList final : public TokenListTypes
   bool empty() const noexcept { return tokens_.empty(); };
   auto size() const noexcept { return tokens_.size(); }
 
+  bool hasAhead(TokenListTypes::iterator pos, index_type count) noexcept { assert(&(pos.list()) == &tokens_); return pos.hasAhead(count); }
+  bool hasBehind(TokenListTypes::iterator pos, index_type count) noexcept { assert(&(pos.list()) == &tokens_); return pos.hasBehind(count); }
 
   TokenList extract(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, last); }
   TokenList extract(TokenListTypes::iterator first, index_type count) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, first + count); }
@@ -105,34 +109,13 @@ struct TokenList final : public TokenListTypes
 namespace std
 {
 
-[[nodiscard]] inline decltype(auto) begin(zax::TokenList& e)
-{
-  return e.begin();
-}
+[[nodiscard]] inline decltype(auto) begin(zax::TokenList& e) { return e.begin(); }
+[[nodiscard]] inline decltype(auto) end(zax::TokenList& e) { return e.end(); }
 
-[[nodiscard]] inline decltype(auto) end(zax::TokenList& e)
-{
-  return e.end();
-}
+[[nodiscard]] inline decltype(auto) begin(const zax::TokenList& e) { return e.begin(); }
+[[nodiscard]] inline decltype(auto) end(const zax::TokenList& e) { return e.end(); }
 
-[[nodiscard]] inline decltype(auto) begin(const zax::TokenList& e)
-{
-  return e.begin();
-}
-
-[[nodiscard]] inline decltype(auto) end(const zax::TokenList& e)
-{
-  return e.end();
-}
-
-[[nodiscard]] inline decltype(auto) cbegin(const zax::TokenList& e)
-{
-  return e.cbegin();
-}
-
-[[nodiscard]] inline decltype(auto) cend(const zax::TokenList& e)
-{
-  return e.cend();
-}
+[[nodiscard]] inline decltype(auto) cbegin(const zax::TokenList& e) { return e.cbegin(); }
+[[nodiscard]] inline decltype(auto) cend(const zax::TokenList& e) { return e.cend(); }
 
 } // namespace std

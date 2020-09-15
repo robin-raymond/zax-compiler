@@ -4,6 +4,92 @@
 
 using namespace zax;
 
+
+//-----------------------------------------------------------------------------
+TokenList zax::extract(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept
+{
+  assert(&first.list() == &last.list());
+  TokenList result;
+  result.tokens_.splice(result.tokens_.end(), first.list(), first.underlying(), last.underlying());
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extract(TokenListTypes::iterator first, index_type count) noexcept
+{
+  return extract(first, first + count);
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extractFromStartToPos(TokenListTypes::iterator pos) noexcept
+{
+  TokenList result;
+  result.tokens_.splice(result.tokens_.end(), pos.list(), pos.list().begin(), pos.underlying());
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extractFromPosToEnd(TokenListTypes::iterator pos) noexcept
+{
+  TokenList result;
+  result.tokens_.splice(result.tokens_.end(), pos.list(), pos.underlying(), pos.list().end());
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+void zax::erase(TokenListTypes::iterator pos) noexcept
+{
+  if (pos.underlying() == pos.list().end())
+    return;
+  pos.list().erase(pos.underlying());
+}
+
+//-----------------------------------------------------------------------------
+void zax::erase(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept
+{
+  assert(&first.list() == &last.list());
+  first.list().erase(first.underlying(), last.underlying());
+}
+
+//-----------------------------------------------------------------------------
+void zax::erase(TokenListTypes::iterator first, index_type count) noexcept
+{
+  erase(first, first + count);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertBefore(TokenListTypes::iterator pos, TokenPtr& token) noexcept
+{
+  pos.list().insert(pos.underlying(), token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertAfter(TokenListTypes::iterator pos, TokenPtr& token) noexcept
+{
+  pos.list().insert((++pos).underlying(), token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insert(TokenListTypes::iterator pos, TokenPtr& token) noexcept
+{
+  insertBefore(pos, token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertCopyBefore(TokenListTypes::iterator pos, const TokenList& rhs) noexcept
+{
+  TokenListTypes::List temp{ rhs.tokens_ };
+  pos.list().splice(pos.underlying(), temp, temp.begin(), temp.end());
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertCopyAfter(TokenListTypes::iterator pos, const TokenList& rhs) noexcept
+{
+  TokenListTypes::List temp{ rhs.tokens_ };
+  pos.list().splice((++pos).underlying(), temp, temp.begin(), temp.end());
+}
+
+
 //-----------------------------------------------------------------------------
 TokenList TokenList::extractFromStartToPos(index_type count) noexcept
 {
@@ -169,85 +255,3 @@ TokenListTypes::const_iterator TokenList::at(index_type pos) const noexcept
 }
 
 
-
-//-----------------------------------------------------------------------------
-TokenList zax::extract(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept
-{
-  TokenList result;
-  result.tokens_.splice(result.tokens_.end(), first.list(), first.underlying(), last.underlying());
-  return result;
-}
-
-//-----------------------------------------------------------------------------
-TokenList zax::extract(TokenListTypes::iterator first, index_type count) noexcept
-{
-  return extract(first, first + count);
-}
-
-//-----------------------------------------------------------------------------
-TokenList zax::extractFromStartToPos(TokenListTypes::iterator pos) noexcept
-{
-  TokenList result;
-  result.tokens_.splice(result.tokens_.end(), pos.list(), pos.list().begin(), pos.underlying());
-  return result;
-}
-
-//-----------------------------------------------------------------------------
-TokenList zax::extractFromPosToEnd(TokenListTypes::iterator pos) noexcept
-{
-  TokenList result;
-  result.tokens_.splice(result.tokens_.end(), pos.list(), pos.underlying(), pos.list().end());
-  return result;
-}
-
-//-----------------------------------------------------------------------------
-void zax::erase(TokenListTypes::iterator pos) noexcept
-{
-  if (pos.underlying() == pos.list().end())
-    return;
-  pos.list().erase(pos.underlying());
-}
-
-//-----------------------------------------------------------------------------
-void zax::erase(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept
-{
-  first.list().erase(first.underlying(), last.underlying());
-}
-
-//-----------------------------------------------------------------------------
-void zax::erase(TokenListTypes::iterator first, index_type count) noexcept
-{
-  erase(first, first + count);
-}
-
-//-----------------------------------------------------------------------------
-void zax::insertBefore(TokenListTypes::iterator pos, TokenPtr& token) noexcept
-{
-  pos.list().insert(pos.underlying(), token);
-}
-
-//-----------------------------------------------------------------------------
-void zax::insertAfter(TokenListTypes::iterator pos, TokenPtr& token) noexcept
-{
-  pos.list().insert((++pos).underlying(), token);
-}
-
-//-----------------------------------------------------------------------------
-void zax::insert(TokenListTypes::iterator pos, TokenPtr& token) noexcept
-{
-  insertBefore(pos, token);
-}
-
-//-----------------------------------------------------------------------------
-void zax::insertCopyBefore(TokenListTypes::iterator pos, const TokenList& rhs) noexcept
-{
-  TokenListTypes::List temp{ rhs.tokens_ };
-  pos.list().splice(pos.underlying(), temp, temp.begin(), temp.end());
-}
-
-//-----------------------------------------------------------------------------
-void zax::insertCopyAfter(TokenListTypes::iterator pos, const TokenList& rhs) noexcept
-{
-  TokenListTypes::List temp{ rhs.tokens_ };
-  pos.list().splice((++pos).underlying(), temp, temp.begin(), temp.end());
-}
