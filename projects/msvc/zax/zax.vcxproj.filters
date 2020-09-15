@@ -36,6 +36,12 @@
     <ClCompile Include="..\..\..\test\test_Tokenizer.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\TokenList.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\test\test_TokenizerList.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\pch.h">
@@ -97,6 +103,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\test\common.h">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\TokenList.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

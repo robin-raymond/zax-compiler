@@ -19,6 +19,7 @@ void actualCheck(
 
 void testOperatorLut() noexcept(false);
 void testTokenizer() noexcept(false);
+void testTokenList() noexcept(false);
 
 void output(StringView testName) noexcept;
 

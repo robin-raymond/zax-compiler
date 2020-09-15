@@ -20,6 +20,8 @@ using Puid = unsigned int;
 template <typename T>
 using optional = std::optional<T>;
 
+using index_type = zs::index_type;
+
 ZAX_DECLARE_STRUCT_PTR(CodeBlock);
 ZAX_DECLARE_STRUCT_PTR(Compiler);
 ZAX_DECLARE_STRUCT_PTR(CompileState);
@@ -33,6 +35,8 @@ ZAX_DECLARE_STRUCT_PTR(SourceFilePath);
 ZAX_DECLARE_STRUCT_PTR(SourceLocation);
 ZAX_DECLARE_STRUCT_PTR(TokenTypes);
 ZAX_DECLARE_STRUCT_PTR(Token);
+ZAX_DECLARE_STRUCT_PTR(TokenListTypes);
+ZAX_DECLARE_STRUCT_PTR(TokenList);
 ZAX_DECLARE_STRUCT_PTR(TypeAlias);
 ZAX_DECLARE_STRUCT_PTR(TypeDefine);
 ZAX_DECLARE_STRUCT_PTR(TokenizerTypes);

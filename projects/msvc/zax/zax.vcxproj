@@ -29,10 +29,12 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Token.cpp" />
     <ClCompile Include="..\..\..\src\Tokenizer.cpp" />
+    <ClCompile Include="..\..\..\src\TokenList.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
     <ClCompile Include="..\..\..\test\test_OperatorLut.cpp" />
     <ClCompile Include="..\..\..\test\test_Tokenizer.cpp" />
+    <ClCompile Include="..\..\..\test\test_TokenizerList.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Compiler.h" />
@@ -51,6 +53,7 @@
     <ClInclude Include="..\..\..\src\SourceLocation.h" />
     <ClInclude Include="..\..\..\src\Token.h" />
     <ClInclude Include="..\..\..\src\Tokenizer.h" />
+    <ClInclude Include="..\..\..\src\TokenList.h" />
     <ClInclude Include="..\..\..\src\types.h" />
     <ClInclude Include="..\..\..\src\Warnings.h" />
     <ClInclude Include="..\..\..\src\zax.h" />
