@@ -1,5 +1,7 @@
 
 #include "types.h"
+#include "version.h"
+#include "Config.h"
 #include "Compiler.h"
 #include "CompileState.h"
 #include "Errors.h"

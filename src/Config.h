@@ -8,8 +8,22 @@ namespace zax
 
 struct Config
 {
-  Text sourceFilePath_;
-  Text outputPath_;
+  bool quiet_{};
+  String inputFilePath_;
+  String outputPath_;
+  String listingFilePath_;
+  int tabStopWidth_{ 8 };
+
+
+  struct MetaData final
+  {
+    String outputPath_;
+    bool json_{};
+    bool bson_{};
+    bool cbor_{};
+    bool msgPack_{};
+    bool ubjson_{};
+  } metaData_;
 };
 
 } // namespace zax

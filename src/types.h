@@ -12,6 +12,7 @@
 
 namespace zax {
 
+using StringStream = std::stringstream;
 using String = std::string;
 using StringView = std::string_view;
 
@@ -25,6 +26,7 @@ using index_type = zs::index_type;
 ZAX_DECLARE_STRUCT_PTR(CodeBlock);
 ZAX_DECLARE_STRUCT_PTR(Compiler);
 ZAX_DECLARE_STRUCT_PTR(CompileState);
+ZAX_DECLARE_STRUCT_PTR(CompilerException);
 ZAX_DECLARE_STRUCT_PTR(Config);
 ZAX_DECLARE_STRUCT_PTR(Context);
 ZAX_DECLARE_STRUCT_PTR(Module);

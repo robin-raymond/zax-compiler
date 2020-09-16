@@ -38,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Compiler.h" />
+    <ClInclude Include="..\..\..\src\CompilerException.h" />
     <ClInclude Include="..\..\..\src\CompileState.h" />
     <ClInclude Include="..\..\..\src\Config.h" />
     <ClInclude Include="..\..\..\src\Context.h" />
@@ -55,6 +56,7 @@
     <ClInclude Include="..\..\..\src\Tokenizer.h" />
     <ClInclude Include="..\..\..\src\TokenList.h" />
     <ClInclude Include="..\..\..\src\types.h" />
+    <ClInclude Include="..\..\..\src\version.h" />
     <ClInclude Include="..\..\..\src\Warnings.h" />
     <ClInclude Include="..\..\..\src\zax.h" />
     <ClInclude Include="..\..\..\test\common.h" />
@@ -147,7 +149,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ZAX_INCLUDE_TESTS;_DEBUG;_CONSOLE;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -183,7 +185,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ZAX_INCLUDE_TESTS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
