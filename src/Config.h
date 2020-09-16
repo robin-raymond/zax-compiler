@@ -9,7 +9,7 @@ namespace zax
 struct Config
 {
   bool quiet_{};
-  String inputFilePath_;
+  std::list<String> inputFilePaths_;
   String outputPath_;
   String listingFilePath_;
   int tabStopWidth_{ 8 };

@@ -18,11 +18,13 @@ namespace
 
 struct Output
 {
+  bool quiet_{};
   int errorNumber_{};
 
-  void write(const StringStream& ss) noexcept
+  void write(const StringStream& ss, bool forceOutput = {}) noexcept
   {
-    std::cout << ss.str();
+    if ((!quiet_) || (forceOutput))
+      std::cout << ss.str();
   }
   int error() noexcept { return errorNumber_; }
   void error(int errorNumber) noexcept { if (0 == errorNumber_) errorNumber_ = errorNumber; }
@@ -52,34 +54,34 @@ void showHelp() noexcept
   ss << "\n";
   ss << " GENERAL OPTIONS:\n";
   ss << "\n";
-  ss << "  -help\n";
-  ss << "  -h\n";
-  ss << "  -?                        display help\n";
+  ss << "  --help\n";
+  ss << "  --h\n";
+  ss << "  --?                       display help\n";
   ss << "\n";
-  ss << "  -version\n";
-  ss << "  -v                        display version\n";
+  ss << "  --version\n";
+  ss << "  --v                       display version\n";
   ss << "\n";
-  ss << "  -q\n";
-  ss << "  -quiet                    suppress displaying output\n";
+  ss << "  --q\n";
+  ss << "  --quiet                   suppress displaying output\n";
   ss << "\n";
-  ss << "  -in <file>                input file\n";
+  ss << "  --in <file> ...           input file\n";
   ss << "\n";
-  ss << "  -output <file>            output file path\n";
+  ss << "  --out <file>              output file path\n";
   ss << "\n";
-  ss << "  -listing <file>           listing file\n";
+  ss << "  --listing <file>          listing file\n";
   ss << "\n";
-  ss << "  -tab <size>               specifies default input file tab size\n";
+  ss << "  --tab <size>              specifies default input file tab size\n";
   ss << "\n";
 #ifdef ZAX_INCLUDE_TESTS
-  ss << "  -test                     run unit tests\n";
+  ss << "  --test                    run unit tests\n";
   ss << "\n";
 #endif //ZAX_INCLUDE_TESTS
   ss << "\n";
   ss << " META-DATA OPTIONS:\n";
   ss << "\n";
-  ss << "  -metadata <file-prefix>   generate file(s) containing metadata\n";
+  ss << "  --metadata <file-prefix>  generate file(s) containing metadata\n";
   ss << "\n";
-  ss << "  -metadata-types <...>     specify the output meta data types, choose from:\n";
+  ss << "  --metadata-types <...>    specify the output meta data types, choose from:\n";
   ss << "                            json\n";
   ss << "                            bson\n";
   ss << "                            cbor\n";
@@ -87,7 +89,7 @@ void showHelp() noexcept
   ss << "                            ubjson\n";
   ss << "\n";
   ss << "\n";
-  singleton().write(ss);
+  singleton().write(ss, true);
 }
 
 //-----------------------------------------------------------------------------
@@ -150,6 +152,7 @@ public:
 //-----------------------------------------------------------------------------
 int main(int argn, char const* argv[])
 {
+  constexpr const StringView prefix{ "--" };
   Config config;
 
   try {
@@ -157,26 +160,30 @@ int main(int argn, char const* argv[])
 
     bool displayVersion{ true };
     bool displayHelp{};
+#ifdef ZAX_INCLUDE_TESTS
     bool runTests{};
+#endif //ZAX_INCLUDE_TESTS
 
     bool expectingValue{};
+    bool multipleValuesPossible{};
 
     for (int loop = 1; loop < argn; ++loop) {
       std::string arg{ argv[loop] };
 
-      if (expectingValue) {
+      if ((expectingValue) || (multipleValuesPossible)) {
         expectingValue = false;
+        multipleValuesPossible = false;
       }
       else if (!lastOption.empty()) {
         expectingValue = true;
       }
 
-      if ('-' == *arg.c_str()) {
+      if (prefix == StringView{ arg }.substr(0, 2)) {
         if ((expectingValue) &&
             (!lastOption.empty()))
           IllegalOption::throwError(lastOption);
 
-        lastOption = &(arg.c_str()[1]);
+        lastOption = arg.substr(prefix.length());
 
         if ((0 == lastOption.compare("help")) ||
             (0 == lastOption.compare("h")) ||
@@ -201,6 +208,7 @@ int main(int argn, char const* argv[])
             (0 == lastOption.compare("quiet"))) {
           displayVersion = false;
           config.quiet_ = true;
+          singleton().quiet_ = true;
           goto resetOption;
         }
 
@@ -223,9 +231,8 @@ int main(int argn, char const* argv[])
       //scope: parseArgument
       {
         if (0 == lastOption.compare("in")) {
-          if (config.inputFilePath_.size() > 0)
-            IllegalOption::throwError(arg);
-          config.inputFilePath_ = arg;
+          multipleValuesPossible = true;
+          config.inputFilePaths_.push_back(arg);
           goto resetOption;
         }
         if ((0 == lastOption.compare("out")) ||
@@ -320,9 +327,9 @@ int main(int argn, char const* argv[])
         return runAllTests();
 #endif // ZAX_INCLUDE_TESTS
 
-      if (config.inputFilePath_.size() < 1) {
-        if (!config.quiet_)
-          showError("input file name must be specified");
+      if (config.inputFilePaths_.size() < 1) {
+        if (!displayHelp)
+          showError("an input file name must be specified");
         return singleton().error();
       }
 
@@ -367,9 +374,7 @@ int main(int argn, char const* argv[])
         //compile();
       }
       catch (const CompilerException& e) {
-        if (!config.quiet_) {
-          zax::output(e);
-        }
+        zax::output(e);
       }
     }
   }
