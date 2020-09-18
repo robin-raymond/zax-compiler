@@ -33,8 +33,7 @@ struct WarningTypes
     VariableDeclaredButNotUsed,
     DuplicateSpecifier,
     SpecifierIgnored,
-    TaskNotDeep,
-    PromiseNotDeep,
+    AsynchronousNotDeep,
     UnknownDirective,
     UnknownDirectiveArgument,
     Forever,
@@ -54,7 +53,7 @@ struct WarningTypes
     LeaseOrLast
   };
 
-  struct WarningDeclare final : public zs::EnumDeclare<Warning, 41>
+  struct WarningDeclare final : public zs::EnumDeclare<Warning, 40>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -81,8 +80,7 @@ struct WarningTypes
         {Warning::VariableDeclaredButNotUsed, "variable-declared-but-not-used"},
         {Warning::DuplicateSpecifier, "duplicate-specifier"},
         {Warning::SpecifierIgnored, "specifier-ignored"},
-        {Warning::TaskNotDeep, "task-not-deep"},
-        {Warning::PromiseNotDeep, "promise-not-deep"},
+        {Warning::AsynchronousNotDeep, "asynchronous-not-deep"},
         {Warning::UnknownDirective, "unknown-directive"},
         {Warning::UnknownDirectiveArgument, "unknown-directive-argument"},
         {Warning::Forever, "forever"},
@@ -104,7 +102,7 @@ struct WarningTypes
     }
   };
 
-  struct WarningHumanReadableDeclare final : public zs::EnumDeclare<Warning, 41>
+  struct WarningHumanReadableDeclare final : public zs::EnumDeclare<Warning, 40>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -131,8 +129,7 @@ struct WarningTypes
         {Warning::VariableDeclaredButNotUsed, "variable-declared-but-not-used"},
         {Warning::DuplicateSpecifier, "duplicate-specifier"},
         {Warning::SpecifierIgnored, "specifier-ignored"},
-        {Warning::TaskNotDeep, "task-not-deep"},
-        {Warning::PromiseNotDeep, "promise-not-deep"},
+        {Warning::AsynchronousNotDeep, "asynchronous-not-deep"},
         {Warning::UnknownDirective, "unknown-directive"},
         {Warning::UnknownDirectiveArgument, "unknown-directive-argument"},
         {Warning::Forever, "forever"},
