@@ -103,9 +103,9 @@ TokenList TokenList::extractFromPosToEnd(index_type count) noexcept
 }
 
 //-----------------------------------------------------------------------------
-void TokenList::erase(index_type pos) noexcept
+void TokenList::erase(index_type count) noexcept
 {
-  zax::erase(zs::makeRandom(tokens_) + pos);
+  zax::erase(zs::makeRandom(tokens_) + count);
 }
 
 //-----------------------------------------------------------------------------
@@ -227,19 +227,19 @@ TokenListTypes::const_iterator TokenList::cend() const noexcept
 }
 
 //-----------------------------------------------------------------------------
-TokenPtr TokenList::operator[](index_type pos) noexcept
+TokenPtr TokenList::operator[](index_type count) noexcept
 {
   if (tokens_.empty())
     return {};
-  return zs::makeRandom(tokens_)[pos];
+  return zs::makeRandom(tokens_)[count];
 }
 
 //-----------------------------------------------------------------------------
-const TokenPtr TokenList::operator[](index_type pos) const noexcept
+const TokenPtr TokenList::operator[](index_type count) const noexcept
 {
   if (tokens_.empty())
     return {};
-  return zs::makeRandom(tokens_)[pos];
+  return zs::makeRandom(tokens_)[count];
 }
 
 //-----------------------------------------------------------------------------

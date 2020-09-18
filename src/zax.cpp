@@ -20,6 +20,8 @@ struct Output
 {
   bool quiet_{};
   int errorNumber_{};
+  int totalErrors_{};
+  int totalWarnings_{};
 
   void write(const StringStream& ss, bool forceOutput = {}) noexcept
   {
@@ -64,7 +66,7 @@ void showHelp() noexcept
   ss << "  --q\n";
   ss << "  --quiet                   suppress displaying output\n";
   ss << "\n";
-  ss << "  --in <file> ...           input file\n";
+  ss << "  --in <file> ...           input files\n";
   ss << "\n";
   ss << "  --out <file>              output file path\n";
   ss << "\n";
@@ -99,6 +101,7 @@ void showError(const std::string& message) noexcept
   std::cout << "\n";
   std::cout << "[ERROR] " << message << "\n";
   std::cout << "\n";
+  ++singleton().totalErrors_;
   singleton().error(-3);
   singleton().write(ss);
 }
@@ -117,12 +120,24 @@ void zax::output(const CompilerException& exception) noexcept
   StringStream ss;
   ss << exception.what();
   switch (exception.type_) {
-    case CompilerException::ErrorType::Info:    break;
-    case CompilerException::ErrorType::Warning: break;
-    case CompilerException::ErrorType::Error:   singleton().error(-1); break;
-    case CompilerException::ErrorType::Fatal:   singleton().error(-2); break;
+    case CompilerException::ErrorType::Informational:   break;
+    case CompilerException::ErrorType::Warning:         ++singleton().totalWarnings_; break;
+    case CompilerException::ErrorType::Error:           ++singleton().totalErrors_; singleton().error(-1); break;
+    case CompilerException::ErrorType::Fatal:           ++singleton().totalErrors_; singleton().error(-2); break;
   }
   singleton().write(ss);
+}
+
+//-----------------------------------------------------------------------------
+int zax::totalErrors() noexcept
+{
+  return singleton().totalErrors_;
+}
+
+//-----------------------------------------------------------------------------
+int zax::totalWarnings() noexcept
+{
+  return singleton().totalWarnings_;
 }
 
 //-----------------------------------------------------------------------------

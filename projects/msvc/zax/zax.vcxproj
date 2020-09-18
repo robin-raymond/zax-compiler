@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\CompilerState.cpp" />
     <ClCompile Include="..\..\..\src\helpers.cpp" />
     <ClCompile Include="..\..\..\src\OperatorLut.cpp" />
     <ClCompile Include="..\..\..\src\pch.cpp">
@@ -30,6 +31,7 @@
     <ClCompile Include="..\..\..\src\Token.cpp" />
     <ClCompile Include="..\..\..\src\Tokenizer.cpp" />
     <ClCompile Include="..\..\..\src\TokenList.cpp" />
+    <ClCompile Include="..\..\..\src\CompilerException.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
     <ClCompile Include="..\..\..\test\test_OperatorLut.cpp" />
@@ -45,6 +47,7 @@
     <ClInclude Include="..\..\..\src\Errors.h" />
     <ClInclude Include="..\..\..\src\Faults.h" />
     <ClInclude Include="..\..\..\src\helpers.h" />
+    <ClInclude Include="..\..\..\src\Informationals.h" />
     <ClInclude Include="..\..\..\src\Module.h" />
     <ClInclude Include="..\..\..\src\OperatorLut.h" />
     <ClInclude Include="..\..\..\src\Panics.h" />

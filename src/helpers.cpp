@@ -51,7 +51,7 @@ std::pair<std::unique_ptr<std::byte[]>, size_t> zax::readBinaryFile(const String
 
 //-----------------------------------------------------------------------------
 bool zax::writeBinaryFile(
-  const std::string fileName,
+  const String fileName,
   const std::byte* source,
   size_t length) noexcept
 {
@@ -80,13 +80,13 @@ abandon:
 }
 
 //-----------------------------------------------------------------------------
-std::string zax::makeIncludeFile(
-  const std::string& inCurrentFile,
-  const std::string& inNewFile,
-  std::string& outFullPathFileName) noexcept
+String zax::makeIncludeFile(
+  const String& inCurrentFile,
+  const String& inNewFile,
+  String& outFullPathFileName) noexcept
 {
-  std::string currentFile = inCurrentFile;
-  std::string newFile = inNewFile;
+  String currentFile = inCurrentFile;
+  String newFile = inNewFile;
 
 #ifdef _WIN32
   std::replace(currentFile.begin(), currentFile.end(), '/', '\\');
@@ -129,7 +129,7 @@ std::map<size_t, StringView> zax::stringSplitView(
   do
   {
     auto found = input.find(splitStr, searchFrom);
-    if (std::string::npos == found) {
+    if (String::npos == found) {
       StringView sub = input.substr(searchFrom);
 
       if (sub.size() > 0) {
@@ -151,11 +151,11 @@ std::map<size_t, StringView> zax::stringSplitView(
 }
 
 //-----------------------------------------------------------------------------
-std::map<size_t, std::string> stringSplit(
+std::map<size_t, String> stringSplit(
   const StringView& input,
   const StringView& splitStr) noexcept
 {
-  std::map<size_t, std::string> outResult;
+  std::map<size_t, String> outResult;
 
   if (input.size() < 1)
     return outResult;
@@ -171,7 +171,7 @@ std::map<size_t, std::string> stringSplit(
   do
   {
     auto found = input.find(splitStr, searchFrom);
-    if (std::string::npos == found) {
+    if (String::npos == found) {
       StringView sub = input.substr(searchFrom);
 
       if (sub.size() > 0) {
@@ -193,15 +193,15 @@ std::map<size_t, std::string> stringSplit(
 }
 
 //-----------------------------------------------------------------------------
-std::string zax::stringMerge(
-  const std::map<size_t, std::string>& input,
+String zax::stringMerge(
+  const std::map<size_t, String>& input,
   const StringView& splitStr) noexcept
 {
   if (input.size() < 1)
     return {};
 
   if (input.size() == 1)
-    return std::string{ input.begin()->second };
+    return String{ input.begin()->second };
 
   size_t count{};
   for (auto& mapping : input) {
@@ -209,7 +209,7 @@ std::string zax::stringMerge(
   }
   count += splitStr.size() * input.size();
 
-  std::string result;
+  String result;
   result.reserve(count);
   for (auto iter = input.begin(); iter != input.end(); ++iter) {
     if (result.size() > 0)
@@ -220,7 +220,7 @@ std::string zax::stringMerge(
 }
 
 //-----------------------------------------------------------------------------
-std::string zax::stringMerge(
+String zax::stringMerge(
   const std::map<size_t, StringView>& input,
   const StringView& splitStr) noexcept
 {
@@ -228,7 +228,7 @@ std::string zax::stringMerge(
     return {};
 
   if (input.size() == 1)
-    return std::string{ input.begin()->second };
+    return String{ input.begin()->second };
 
   size_t count{};
   for (auto& mapping : input) {
@@ -236,7 +236,7 @@ std::string zax::stringMerge(
   }
   count += splitStr.size() * input.size();
 
-  std::string result;
+  String result;
   result.reserve(count);
   for (auto iter = input.begin(); iter != input.end(); ++iter) {
     if (result.size() > 0)
@@ -244,4 +244,29 @@ std::string zax::stringMerge(
     result += (*iter).second;
   }
   return result;
+}
+
+//-----------------------------------------------------------------------------
+String zax::stringReplace(
+  const StringView& input,
+  const StringMap& mapping) noexcept
+{
+  if (mapping.size() < 1)
+    return String{ input };
+
+  String output{ input };
+
+  for (auto& [search, replace] : mapping) {
+    String::size_type lastPos{};
+    while (true) {
+      auto pos{ output.find(search, lastPos) };
+      if (pos == String::npos)
+        break;
+
+      output.replace(pos, search.length(), replace);
+      lastPos = pos + search.length();
+    }
+  }
+
+  return output;
 }

@@ -33,7 +33,6 @@ struct TokenizerBasics
   {
     TEST(pos_.line_ == line);
     TEST(pos_.column_ == column);
-    TEST(pos_.overrideLine == line);
   }
 
   //-------------------------------------------------------------------------
@@ -41,9 +40,7 @@ struct TokenizerBasics
   {
     TEST(pos_.line_ == line);
     TEST(pos_.column_ == column);
-    TEST(pos_.overrideLine == overrideLine);
   }
-
 
   //-------------------------------------------------------------------------
   void testUtf8Bom() noexcept(false)

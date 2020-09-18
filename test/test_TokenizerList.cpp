@@ -1582,6 +1582,7 @@ struct TokenListBasics
     checkExtractFromStartToPos();
     checkExtractFromStartToPosCount();
     checkExtractFromPosToEnd();
+    checkExtractFromPosToEndCount();
 
     checkErase();
     checkEraseCount();

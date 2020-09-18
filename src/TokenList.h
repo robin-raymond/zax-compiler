@@ -22,6 +22,9 @@ struct TokenListTypes
 inline bool hasAhead(TokenListTypes::iterator pos, index_type count) noexcept { return pos.hasAhead(count); }
 inline bool hasBehind(TokenListTypes::iterator pos, index_type count) noexcept { return pos.hasBehind(count); }
 
+inline bool hasAhead(TokenListTypes::const_iterator pos, index_type count) noexcept { return pos.hasAhead(count); }
+inline bool hasBehind(TokenListTypes::const_iterator pos, index_type count) noexcept { return pos.hasBehind(count); }
+
 TokenList extract(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept;
 TokenList extract(TokenListTypes::iterator first, index_type count) noexcept;
 
@@ -44,10 +47,10 @@ struct TokenList final : public TokenListTypes
 {
   List tokens_;
 
-  TokenList extractFromStartToPos(index_type count) noexcept;
-  TokenList extractFromPosToEnd(index_type count) noexcept;
+  [[nodiscard]] TokenList extractFromStartToPos(index_type count) noexcept;
+  [[nodiscard]] TokenList extractFromPosToEnd(index_type count) noexcept;
 
-  void erase(index_type pos) noexcept;
+  void erase(index_type count) noexcept;
 
   void pushFront(TokenPtr& token) noexcept;
   void pushBack(TokenPtr& token) noexcept;
@@ -67,41 +70,44 @@ struct TokenList final : public TokenListTypes
   void copyPushFront(const TokenList& rhs) noexcept;
   void copyPushBack(const TokenList& rhs) noexcept;
 
-  iterator begin() noexcept;
-  iterator end() noexcept;
-  const_iterator begin() const noexcept;
-  const_iterator end() const noexcept;
-  const_iterator cbegin() const noexcept;
-  const_iterator cend() const noexcept;
+  [[nodiscard]] iterator begin() noexcept;
+  [[nodiscard]] iterator end() noexcept;
+  [[nodiscard]] const_iterator begin() const noexcept;
+  [[nodiscard]] const_iterator end() const noexcept;
+  [[nodiscard]] const_iterator cbegin() const noexcept;
+  [[nodiscard]] const_iterator cend() const noexcept;
 
-  TokenPtr operator[](index_type pos) noexcept;
-  const TokenPtr operator[](index_type pos) const noexcept;
+  [[nodiscard]] TokenPtr operator[](index_type count) noexcept;
+  [[nodiscard]] const TokenPtr operator[](index_type count) const noexcept;
 
-  iterator at(index_type pos) noexcept;
-  const_iterator at(index_type pos) const noexcept;
+  [[nodiscard]] iterator at(index_type count) noexcept;
+  [[nodiscard]] const_iterator at(index_type count) const noexcept;
 
-  bool empty() const noexcept { return tokens_.empty(); };
-  auto size() const noexcept { return tokens_.size(); }
+  [[nodiscard]] bool empty() const noexcept { return tokens_.empty(); };
+  [[nodiscard]] auto size() const noexcept { return tokens_.size(); }
 
-  bool hasAhead(TokenListTypes::iterator pos, index_type count) noexcept { assert(&(pos.list()) == &tokens_); return pos.hasAhead(count); }
-  bool hasBehind(TokenListTypes::iterator pos, index_type count) noexcept { assert(&(pos.list()) == &tokens_); return pos.hasBehind(count); }
+  [[nodiscard]] bool hasAhead(iterator pos, index_type count) const noexcept { assert(&(pos.list()) == &tokens_); return pos.hasAhead(count); }
+  [[nodiscard]] bool hasBehind(iterator pos, index_type count) const noexcept { assert(&(pos.list()) == &tokens_); return pos.hasBehind(count); }
 
-  TokenList extract(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, last); }
-  TokenList extract(TokenListTypes::iterator first, index_type count) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, first + count); }
+  [[nodiscard]] bool hasAhead(const_iterator pos, index_type count) const noexcept { assert(&(pos.list()) == &tokens_); return pos.hasAhead(count); }
+  [[nodiscard]] bool hasBehind(const_iterator pos, index_type count) const noexcept { assert(&(pos.list()) == &tokens_); return pos.hasBehind(count); }
 
-  TokenList extractFromStartToPos(TokenListTypes::iterator pos) noexcept { assert(&(pos.list()) == &tokens_); return zax::extractFromStartToPos(pos); }
-  TokenList extractFromPosToEnd(TokenListTypes::iterator pos) noexcept { assert(&(pos.list()) == &tokens_); return zax::extractFromPosToEnd(pos); }
+  [[nodiscard]] TokenList extract(iterator first, iterator last) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, last); }
+  [[nodiscard]] TokenList extract(iterator first, index_type count) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, first + count); }
 
-  void erase(TokenListTypes::iterator pos) noexcept { assert(&(pos.list()) == &tokens_);  zax::erase(pos); }
-  void erase(TokenListTypes::iterator first, TokenListTypes::iterator last) noexcept { assert(&(first.list()) == &tokens_); zax::erase(first, last); }
-  void erase(TokenListTypes::iterator first, index_type count) noexcept { assert(&(first.list()) == &tokens_); zax::erase(first, first + count); }
+  [[nodiscard]] TokenList extractFromStartToPos(iterator pos) noexcept { assert(&(pos.list()) == &tokens_); return zax::extractFromStartToPos(pos); }
+  [[nodiscard]] TokenList extractFromPosToEnd(iterator pos) noexcept { assert(&(pos.list()) == &tokens_); return zax::extractFromPosToEnd(pos); }
 
-  void insertBefore(TokenListTypes::iterator pos, TokenPtr& token) noexcept { assert(&(pos.list()) == &tokens_); zax::insertBefore(pos, token); }
-  void insertAfter(TokenListTypes::iterator pos, TokenPtr& token) noexcept { assert(&(pos.list()) == &tokens_); zax::insertAfter(pos, token); }
-  void insert(TokenListTypes::iterator pos, TokenPtr& token) noexcept { assert(&(pos.list()) == &tokens_); zax::insertBefore(pos, token); }
+  void erase(iterator pos) noexcept { assert(&(pos.list()) == &tokens_); zax::erase(pos); }
+  void erase(iterator first, iterator last) noexcept { assert(&(first.list()) == &tokens_); zax::erase(first, last); }
+  void erase(iterator first, index_type count) noexcept { assert(&(first.list()) == &tokens_); zax::erase(first, first + count); }
 
-  void insertCopyBefore(TokenListTypes::iterator pos, const TokenList& rhs) noexcept { assert(&(pos.list()) == &tokens_); zax::insertCopyBefore(pos, rhs); }
-  void insertCopyAfter(TokenListTypes::iterator pos, const TokenList& rhs) noexcept { assert(&(pos.list()) == &tokens_); zax::insertCopyAfter(pos, rhs); }
+  void insertBefore(iterator pos, TokenPtr& token) noexcept { assert(&(pos.list()) == &tokens_); zax::insertBefore(pos, token); }
+  void insertAfter(iterator pos, TokenPtr& token) noexcept { assert(&(pos.list()) == &tokens_); zax::insertAfter(pos, token); }
+  void insert(iterator pos, TokenPtr& token) noexcept { assert(&(pos.list()) == &tokens_); zax::insertBefore(pos, token); }
+
+  void insertCopyBefore(iterator pos, const TokenList& rhs) noexcept { assert(&(pos.list()) == &tokens_); zax::insertCopyBefore(pos, rhs); }
+  void insertCopyAfter(iterator pos, const TokenList& rhs) noexcept { assert(&(pos.list()) == &tokens_); zax::insertCopyAfter(pos, rhs); }
 };
 
 } // namespace zax

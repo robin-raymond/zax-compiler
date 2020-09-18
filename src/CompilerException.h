@@ -1,17 +1,18 @@
 #pragma once
 
 #include "types.h"
+#include "Informationals.h"
+#include "Warnings.h"
+#include "Errors.h"
 
 namespace zax
 {
-
-void output(const CompilerException& exception) noexcept;
 
 struct CompilerException final : public std::exception
 {
   enum class ErrorType
   {
-    Info,
+    Informational,
     Warning,
     Error,
     Fatal
@@ -22,7 +23,7 @@ struct CompilerException final : public std::exception
     constexpr const Entries operator()() const noexcept
     {
       return { {
-        {ErrorType::Info, "info"},
+        {ErrorType::Informational, "info"},
         {ErrorType::Warning, "warning"},
         {ErrorType::Error, "error"},
         {ErrorType::Fatal, "fatal"}
@@ -46,8 +47,8 @@ struct CompilerException final : public std::exception
     const std::string& fileName,
     int line,
     int column,
-    String iana,
-    const std::string& message
+    const String& iana,
+    const String& message
   ) noexcept :
     fileName_{ fileName },
     line_{ line },
@@ -55,7 +56,7 @@ struct CompilerException final : public std::exception
     iana_{ iana },
     message_{ message }
   {
-    std::stringstream ss;
+    StringStream ss;
 
     bool added{};
     bool addedBracket{};
@@ -90,34 +91,34 @@ struct CompilerException final : public std::exception
     what_ = ss.str();
   }
 
-  static void throwError(
-    ErrorType type,
-    String fileName,
-    int line,
-    int column,
-    String iana,
-    String message
-  ) noexcept(false)
-  {
-    throw CompilerException{ type, fileName, line, column, iana, message };
-  }
-
-  static void showError(
-    ErrorType type,
-    String fileName,
-    int line,
-    int column,
-    String iana,
-    String message
-  ) noexcept(false)
-  {
-    output(CompilerException{ type, fileName, line, column, iana, message });
-  }
-
   const char* what() const noexcept final
   {
     return what_.c_str();
   }
 };
+
+int totalErrors() noexcept;
+int totalWarnings() noexcept;
+
+void output(const CompilerException& exception) noexcept;
+inline void throwException(const CompilerException& exception) noexcept(false) { throw exception; }
+
+void output(
+  InformationalTypes::Informational informational,
+  TokenPtr token,
+  const StringMap& params = {}) noexcept;
+void output(
+  WarningTypes::Warning warning,
+  bool treatAsError,
+  TokenPtr token,
+  const StringMap& params = {}) noexcept;
+void output(ErrorTypes::Error error,
+  TokenPtr token,
+  const StringMap& params = {}) noexcept;
+
+void throwException(
+  ErrorTypes::Error error,
+  TokenPtr token,
+  const StringMap& params = {}) noexcept(false);
 
 } // namespace zax

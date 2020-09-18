@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Tokenizer.h"
 #include "OperatorLut.h"
+#include "CompilerException.h"
 
 using namespace zax;
 using namespace std::string_view_literals;
@@ -12,10 +13,9 @@ bool TokenizerTypes::ParserPos::operator==(const ParserPos& rhs) const noexcept
   return
     (line_ == rhs.line_) &&
     (column_ == rhs.column_) &&
-    (overrideLine == rhs.overrideLine) &&
     (pos_ == rhs.pos_) &&
     (tabSize_ == rhs.tabSize_) &&
-    (overrideSkip == rhs.overrideSkip);
+    (lineSkip_ == rhs.lineSkip_);
 }
 
 //-----------------------------------------------------------------------------
@@ -23,13 +23,32 @@ bool TokenizerTypes::ParserPos::sameLocation(const ParserPos& rhs) const noexcep
 {
   return
     (line_ == rhs.line_) &&
-    (column_ == rhs.column_) &&
-    (overrideLine == rhs.overrideLine);
+    (column_ == rhs.column_);
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::Tokenizer() noexcept
+Tokenizer::Tokenizer(
+  const SourceFilePathPtr& filePath,
+  std::pair< std::unique_ptr<std::byte[]>, size_t>&& rawContents,
+  const CompileStatePtr& compileState,
+  const OperatorLutConstPtr& operatorLut
+) noexcept :
+  filePath_(filePath),
+  rawContents_(std::move(rawContents)),
+  compileState_(compileState),
+  operatorLut_(operatorLut)
 {
+  assert(filePath_);
+  assert(rawContents_.first);
+  assert(compileState_);
+  assert(operatorLut_);
+
+  static_assert(sizeof(std::byte) == sizeof(char));
+  parserPos_.pos_ = StringView{ reinterpret_cast<const char *>(rawContents_.first.get()), rawContents_.second };
+
+  errorCallback_ = [](ErrorTypes::Error error, TokenPtr token) noexcept {
+    output(error, token);
+  };
 }
 
 //-----------------------------------------------------------------------------
@@ -71,14 +90,12 @@ void Tokenizer::count(ParserPos& parserPos, char c) noexcept
     }
     case '\f':
     case '\n':  {
-      ++parserPos.line_;
-      parserPos.overrideLine += parserPos.overrideSkip;
+      parserPos.line_ += parserPos.lineSkip_;
       parserPos.column_ = 1;
       return;
     }
     case '\v':  {
-      ++parserPos.line_;
-      parserPos.overrideLine += parserPos.overrideSkip;
+      parserPos.line_ += parserPos.lineSkip_;
       break;
     }
     case '\t':  {
@@ -508,4 +525,580 @@ optional<TokenizerTypes::IllegalToken> Tokenizer::consumeKnownIllegalToken(Parse
   result.token_ = makeStringView(start, pos);
   parserPos.pos_ = makeStringView(pos, end);
   return result;
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::prime() noexcept
+{
+  if (!parsedTokens_.empty())
+    return;
+  primeNext();
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::prime() const noexcept
+{
+  if (!parsedTokens_.empty())
+    return;
+  primeNext();
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::primeNext() noexcept
+{
+  bool firstPrime{ reinterpret_cast<const char *>(rawContents_.first.get()) == parserPos_.pos_.data() };
+  if (firstPrime)
+    consumeUtf8Bom(parserPos_);
+
+  auto oldPos{ parserPos_ };
+
+  auto makeToken{ [&]() noexcept -> TokenPtr {
+    auto token{ std::make_shared<Token>() };
+    token->location_.filePath_ = filePath_;
+    token->location_.line_ = oldPos.line_;
+    token->location_.column_ = oldPos.column_;
+    token->compileState_ = compileState_;
+  } };
+
+  auto whitespace{ [&]() noexcept -> bool {
+    while (true) {
+      auto value{ consumeWhitespace(parserPos_) };
+      if (!value)
+        break;
+
+      if (value->addNewLine_) {
+        auto tokenNewLine{ std::make_shared<Token>() };
+        tokenNewLine->type_ = TokenTypes::Type::Separator;
+        tokenNewLine->originalToken_ = value->originalToken_;
+        tokenNewLine->token_ = value->token_;
+        parsedTokens_.pushBack(tokenNewLine);
+      }
+    }
+    return false;
+  } };
+
+  auto comment{ [&]() noexcept -> bool {
+    auto value{ consumeComment(parserPos_) };
+    if (!value)
+      return false;
+
+    auto token{ std::make_shared<Token>() };
+    token->type_ = TokenTypes::Type::Comment;
+    token->originalToken_ = value->originalToken_;
+    token->token_ = value->token_;
+    parsedTokens_.pushBack(token);
+
+    if (value->addNewLine_) {
+      auto tokenNewLine{ std::make_shared<Token>() };
+      tokenNewLine->type_ = TokenTypes::Type::Separator;
+      tokenNewLine->originalToken_ = value->originalToken_;
+      tokenNewLine->token_ = value->token_;
+      parsedTokens_.pushBack(tokenNewLine);
+    }
+
+    if (!value->foundEnding_)
+      errorCallback_(ErrorTypes::Error::MissingEndOfComment, token);
+
+    return true;
+  } };
+
+  auto quote{ [&]() noexcept -> bool {
+    auto value{ consumeQuote(parserPos_) };
+    if (!value)
+      return false;
+
+    auto token{ std::make_shared<Token>() };
+    token->type_ = TokenTypes::Type::Quote;
+    token->originalToken_ = value->originalToken_;
+    token->token_ = value->token_;
+    parsedTokens_.pushBack(token);
+
+    if (!value->foundEnding_)
+      errorCallback_(ErrorTypes::Error::MissingEndOfQuote, token);
+
+    return true;
+  } };
+
+  auto literal{ [&]() noexcept -> bool {
+    auto value{ consumeLiteral(parserPos_) };
+    if (!value)
+      return false;
+
+    auto token{ std::make_shared<Token>() };
+    token->type_ = TokenTypes::Type::Symbolic;
+    token->originalToken_ = value->token_;
+    token->token_ = value->token_;
+    parsedTokens_.pushBack(token);
+    return true;
+  } };
+
+  auto numeric{ [&]() noexcept -> bool {
+    auto value{ consumeNumeric(parserPos_) };
+    if (!value)
+      return false;
+
+    auto token{ std::make_shared<Token>() };
+    token->type_ = TokenTypes::Type::Number;
+    token->originalToken_ = value->token_;
+    token->token_ = value->token_;
+    if (value->illegalSequence_)
+      errorCallback_(ErrorTypes::Error::ConstantSyntax, token);
+
+    parsedTokens_.pushBack(token);
+    return true;
+  } };
+
+  auto oper{ [&]() noexcept -> bool {
+    auto value{ consumeOperator(*operatorLut_, parserPos_) };
+    if (!value)
+      return false;
+
+    auto token{ std::make_shared<Token>() };
+    token->type_ = TokenTypes::Type::Number;
+    token->originalToken_ = value->token_;
+    token->token_ = value->token_;
+
+    parsedTokens_.pushBack(token);
+    return true;
+  } };
+
+  auto illegal{ [&]() noexcept -> bool {
+    auto value{ consumeKnownIllegalToken(parserPos_) };
+    if (!value)
+      return true;
+
+    auto token{ std::make_shared<Token>() };
+    token->type_ = TokenTypes::Type::Number;
+    token->originalToken_ = value->token_;
+    token->token_ = value->token_;
+
+    errorCallback_(ErrorTypes::Error::ConstantSyntax, token);
+    return false;
+  } };
+
+  while (true) {
+    if (whitespace())
+      return;
+    if (comment())
+      return;
+    if (quote())
+      return;
+    if (literal())
+      return;
+    if (numeric())
+      return;
+    if (oper())
+      return;
+
+    if (illegal())
+      return;
+  }
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::primeNext() const noexcept
+{
+  // mutable lazy iterator is able to modify contents even though it's
+  // technically supposed to be a const operation (and it is in the sense
+  // that the list contents are not being modified)
+  const_cast<Tokenizer*>(this)->primeNext();
+}
+
+//-----------------------------------------------------------------------------
+TokenList::iterator Tokenizer::tokenListBegin() noexcept
+{
+  prime();
+  return parsedTokens_.begin();
+}
+
+//-----------------------------------------------------------------------------
+TokenList::const_iterator Tokenizer::tokenListBegin() const noexcept
+{
+  prime();
+  return parsedTokens_.begin();
+}
+
+//-----------------------------------------------------------------------------
+TokenList::const_iterator Tokenizer::tokenListCBegin() const noexcept
+{
+  prime();
+  return parsedTokens_.cbegin();
+}
+
+//-----------------------------------------------------------------------------
+TokenList::iterator Tokenizer::tokenListEnd() noexcept
+{
+  return parsedTokens_.end();
+}
+
+//-----------------------------------------------------------------------------
+TokenList::const_iterator Tokenizer::tokenListEnd() const noexcept
+{
+  return parsedTokens_.end();
+}
+
+//-----------------------------------------------------------------------------
+TokenList::const_iterator Tokenizer::tokenListCEnd() const noexcept
+{
+  return parsedTokens_.cend();
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::advance(TokenList::iterator& iter) noexcept
+{
+  if (iter == parsedTokens_.end())
+    return;
+
+  // attempt to use previously parsed token if available
+  auto temp{ iter };
+  ++temp;
+  if (temp != parsedTokens_.end()) {
+    iter = temp;
+    return;
+  }
+
+  primeNext();
+  ++iter;
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::advance(TokenList::const_iterator& iter) const noexcept
+{
+  if (iter == parsedTokens_.end())
+    return;
+
+  // attempt to use previously parsed token if available
+  auto temp{ iter };
+  ++temp;
+  if (temp != parsedTokens_.end()) {
+    iter = temp;
+    return;
+  }
+
+  primeNext();
+  ++iter;
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extractFromStartToPos(index_type count) noexcept
+{
+  (void)hasAhead(begin(), count);
+  return parsedTokens_.extractFromStartToPos(count);
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extractFromPosToEnd(index_type count) noexcept
+{
+  (void)hasAhead(begin(), count);
+  return parsedTokens_.extractFromPosToEnd(count);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::erase(index_type count) noexcept
+{
+  (void)hasAhead(begin(), count);
+  parsedTokens_.erase(count);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::pushFront(TokenPtr& token) noexcept
+{
+  parsedTokens_.pushFront(token);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::pushBack(TokenPtr& token) noexcept
+{
+  parsedTokens_.pushBack(token);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::pushFront(TokenPtr&& token) noexcept
+{
+  parsedTokens_.pushFront(token);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::pushBack(TokenPtr&& token) noexcept
+{
+  parsedTokens_.pushBack(token);
+}
+
+//-----------------------------------------------------------------------------
+TokenPtr Tokenizer::popFront() noexcept
+{
+  return parsedTokens_.popFront();
+}
+
+//-----------------------------------------------------------------------------
+TokenPtr Tokenizer::popBack() noexcept
+{
+  return parsedTokens_.popBack();
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::extractThenPushFront(TokenList& rhs) noexcept
+{
+  parsedTokens_.extractThenPushFront(rhs);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::extractThenPushBack(TokenList& rhs) noexcept
+{
+  parsedTokens_.extractThenPushBack(rhs);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::extractThenPushFront(TokenList&& rhs) noexcept
+{
+  parsedTokens_.extractThenPushFront(rhs);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::extractThenPushBack(TokenList&& rhs) noexcept
+{
+  parsedTokens_.extractThenPushBack(rhs);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::copyPushFront(const TokenList& rhs) noexcept
+{
+  parsedTokens_.copyPushFront(rhs);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::copyPushBack(const TokenList& rhs) noexcept
+{
+  parsedTokens_.copyPushBack(rhs);
+}
+
+//-----------------------------------------------------------------------------
+TokenPtr Tokenizer::operator[](index_type count) noexcept
+{
+  (void)hasAhead(begin(), count);
+  return parsedTokens_[count];
+}
+
+//-----------------------------------------------------------------------------
+const TokenPtr Tokenizer::operator[](index_type count) const noexcept
+{
+  (void)hasAhead(begin(), count);
+  return parsedTokens_[count];
+}
+
+//-----------------------------------------------------------------------------
+Tokenizer::iterator Tokenizer::at(index_type count) noexcept
+{
+  (void)hasAhead(begin(), count);
+  return iterator{ *this, parsedTokens_.at(count) };
+}
+
+//-----------------------------------------------------------------------------
+Tokenizer::const_iterator Tokenizer::at(index_type count) const noexcept
+{
+  (void)hasAhead(begin(), count);
+  return const_iterator{ *this, parsedTokens_.at(count) };
+}
+
+//-----------------------------------------------------------------------------
+bool Tokenizer::empty() const noexcept
+{
+  prime();
+  return parsedTokens_.empty();
+}
+
+//-----------------------------------------------------------------------------
+Tokenizer::size_type Tokenizer::size() const noexcept
+{
+  size_type totalSize{ parsedTokens_.size() };
+  totalSize += parserPos_.pos_.size();
+  return totalSize;
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extract(iterator first, iterator last) noexcept
+{
+  assert(&(first.list()) == this);
+  return zax::extract(first, last);
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extract(iterator first, index_type count) noexcept
+{
+  assert(&(first.list()) == this);
+  return zax::extract(first, first + count);
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extractFromStartToPos(iterator pos) noexcept
+{
+  assert(&(pos.list()) == this);
+  return zax::extractFromStartToPos(pos);
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extractFromPosToEnd(iterator pos) noexcept
+{
+  assert(&(pos.list()) == this);
+  return zax::extractFromPosToEnd(pos);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::erase(iterator pos) noexcept
+{
+  assert(&(pos.list()) == this);
+  zax::erase(pos);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::erase(iterator first, iterator last) noexcept
+{
+  assert(&(first.list()) == this);
+  zax::erase(first, last);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::erase(iterator first, index_type count) noexcept
+{
+  assert(&(first.list()) == this);
+  zax::erase(first, first + count);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::insertBefore(iterator pos, TokenPtr& token) noexcept
+{
+  assert(&(pos.list()) == this);
+  zax::insertBefore(pos, token);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::insertAfter(iterator pos, TokenPtr& token) noexcept
+{
+  assert(&(pos.list()) == this);
+  zax::insertAfter(pos, token);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::insert(iterator pos, TokenPtr& token) noexcept
+{
+  assert(&(pos.list()) == this);
+  zax::insertBefore(pos, token);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::insertCopyBefore(iterator pos, const TokenList& rhs) noexcept
+{
+  assert(&(pos.list()) == this);
+  zax::insertCopyBefore(pos, rhs);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::insertCopyAfter(iterator pos, const TokenList& rhs) noexcept
+{
+  assert(&(pos.list()) == this);
+  zax::insertCopyAfter(pos, rhs);
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept
+{
+  assert(first.valid());
+  assert(last.valid());
+  auto& list{ first.list() };
+  assert(&list == &last.list());
+  return list.parsedTokens_.extract(first.underlying(), last.underlying());
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extract(Tokenizer::iterator first, index_type count) noexcept
+{
+  assert(first.valid());
+  auto& list{ first.list() };
+
+  (void)list.hasAhead(first, count);
+  return list.parsedTokens_.extract(first.underlying(), count);
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extractFromStartToPos(Tokenizer::iterator pos) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.extractFromStartToPos(pos.underlying());
+}
+
+//-----------------------------------------------------------------------------
+TokenList zax::extractFromPosToEnd(Tokenizer::iterator pos) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.extractFromPosToEnd(pos.underlying());
+}
+
+//-----------------------------------------------------------------------------
+void zax::erase(Tokenizer::iterator pos) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.erase(pos.underlying());
+}
+
+//-----------------------------------------------------------------------------
+void zax::erase(Tokenizer::iterator first, Tokenizer::iterator last) noexcept
+{
+  assert(first.valid());
+  assert(last.valid());
+  auto& list{ first.list() };
+  assert(&list == &last.list());
+  return list.parsedTokens_.erase(first.underlying(), last.underlying());
+}
+
+//-----------------------------------------------------------------------------
+void zax::erase(Tokenizer::iterator first, index_type count) noexcept
+{
+  assert(first.valid());
+  auto& list{ first.list() };
+
+  (void)list.hasAhead(first, count);
+  return list.parsedTokens_.erase(first.underlying(), count);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertBefore(Tokenizer::iterator pos, TokenPtr& token) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.insertBefore(pos.underlying(), token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertAfter(Tokenizer::iterator pos, TokenPtr& token) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.insertAfter(pos.underlying(), token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insert(Tokenizer::iterator pos, TokenPtr& token) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.insert(pos.underlying(), token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertCopyBefore(Tokenizer::iterator pos, const TokenList& rhs) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.insertCopyBefore(pos.underlying(), rhs);
+}
+
+//-----------------------------------------------------------------------------
+void zax::insertCopyAfter(Tokenizer::iterator pos, const TokenList& rhs) noexcept
+{
+  assert(pos.valid());
+  auto& list{ pos.list() };
+  return list.parsedTokens_.insertCopyAfter(pos.underlying(), rhs);
 }

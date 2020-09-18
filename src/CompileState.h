@@ -42,6 +42,8 @@ struct CompileState
     inline bool constant() const { return !inconstant_; }
     inline bool inconstant() const { return inconstant_; }
   } functionDefault_;
+
+  bool isWarningAnError(WarningTypes::Warning warning) noexcept;
 };
 
 } // namespace zax

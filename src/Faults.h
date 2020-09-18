@@ -40,12 +40,14 @@ struct Faults
 
   State& at(TEnum value) noexcept
   {
-    return current_[value];
+    assert(TEnumTraits::toUnderlying(value) < Size);
+    return current_[TEnumTraits::toUnderlying(value)];
   }
 
   const State& at(TEnum value) const noexcept
   {
-    return current_[value];
+    assert(TEnumTraits::toUnderlying(value) < Size);
+    return current_[TEnumTraits::toUnderlying(value)];
   }
  
   bool enableForceError(TEnum value) noexcept
