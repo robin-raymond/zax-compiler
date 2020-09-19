@@ -13,9 +13,8 @@ struct TokenTypes
   enum class Type
   {
     Separator,
-    Keyword,
-    Symbolic,
-    Punctuation,
+    Literal,
+    Operator,
     Number,
     Quote,
     Comment
@@ -27,9 +26,8 @@ struct TokenTypes
     {
       return { {
         {Type::Separator, "separator"},
-        {Type::Keyword, "keyword"},
-        {Type::Symbolic, "symbolic"},
-        {Type::Punctuation, "punctuation"},
+        {Type::Literal, "literal"},
+        {Type::Operator, "operator"},
         {Type::Number, "number"},
         {Type::Quote, "quote"},
         {Type::Comment, "comment"}

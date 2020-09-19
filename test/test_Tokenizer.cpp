@@ -4,10 +4,15 @@
 #include "common.h"
 
 #include "../src/Tokenizer.h"
+#include "../src/SourceFilePath.h"
+#include "../src/CompileState.h"
+#include "../src/CompilerException.h"
 #include "../src/OperatorLut.h"
 
 using TokenizerTypes = zax::TokenizerTypes;
 using Tokenizer = zax::Tokenizer;
+using Token = zax::Token;
+using TokenPtr = zax::TokenPtr;
 
 namespace zaxTest
 {
@@ -649,11 +654,11 @@ struct TokenizerBasics
       pos_.pos_ = "\'something to see here\n\n \vhello";
       auto result = Tokenizer::consumeQuote(pos_);
       TEST(result.has_value());
-      TEST(result->originalToken_ == "\'something to see here\n\n \vhello");
-      TEST(result->token_ == "something to see here\n\n \vhello");
+      TEST(result->originalToken_ == "\'something to see here");
+      TEST(result->token_ == "something to see here");
       TEST(!result->foundEnding_);
-      expect(4, 7);
-      TEST(pos_.pos_.empty());
+      expect(1, 43 - 20 + 1 - 1);
+      TEST(pos_.pos_ == "\n\n \vhello");
     }
 
     {
@@ -733,11 +738,11 @@ struct TokenizerBasics
       pos_.pos_ = "\'something \"to\" see here\n\'hello";
       auto result = Tokenizer::consumeQuote(pos_);
       TEST(result.has_value());
-      TEST(result->originalToken_ == "\'something \"to\" see here\n\'");
-      TEST(result->token_ == "something \"to\" see here\n");
-      TEST(result->foundEnding_);
-      expect(2, 2);
-      TEST(pos_.pos_ == "hello");
+      TEST(result->originalToken_ == "\'something \"to\" see here");
+      TEST(result->token_ == "something \"to\" see here");
+      TEST(!result->foundEnding_);
+      expect(1, 47-20+1-3);
+      TEST(pos_.pos_ == "\n\'hello");
     }
 
     {
@@ -745,11 +750,11 @@ struct TokenizerBasics
       pos_.pos_ = "\"\nsomething \'to\' see here\"hello";
       auto result = Tokenizer::consumeQuote(pos_);
       TEST(result.has_value());
-      TEST(result->originalToken_ == "\"\nsomething \'to\' see here\"");
-      TEST(result->token_ == "\nsomething \'to\' see here");
-      TEST(result->foundEnding_);
-      expect(2, 45 - 21 + 1);
-      TEST(pos_.pos_ == "hello");
+      TEST(result->originalToken_ == "\"");
+      TEST(result->token_ == "");
+      TEST(!result->foundEnding_);
+      expect(1, 2);
+      TEST(pos_.pos_ == "\nsomething \'to\' see here\"hello");
     }
 
     {
@@ -1226,9 +1231,1168 @@ struct TokenizerBasics
 };
 
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct TokenizerInstance
+{
+  std::optional<Tokenizer> tokenizer_;
+
+  zax::SourceFilePathPtr filePath_{ std::make_shared<zax::SourceFilePath>() };
+  zax::CompileStatePtr compileState_{ std::make_shared<zax::CompileState>() };
+  zax::OperatorLutPtr operatorLut_{ std::make_shared<zax::OperatorLut>() };
+
+  struct ExpectedFailures
+  {
+    zax::ErrorTypes::Error error_{};
+    int line_{};
+    int column_{};
+    ExpectedFailures(zax::ErrorTypes::Error error, int line, int column) noexcept(false) :
+      error_(error),
+      line_(line),
+      column_(column)
+    {}
+  };
+
+  std::list<ExpectedFailures> failures_;
+
+  //-------------------------------------------------------------------------
+  void reset() noexcept
+  {
+    TEST(failures_.size() < 1);
+    tokenizer_.reset();
+  }
+
+  //-------------------------------------------------------------------------
+  void prepare(std::string_view value) noexcept(false)
+  {
+    reset();
+    static_assert(sizeof(char) == sizeof(std::byte));
+    std::pair<std::unique_ptr<std::byte[]>, size_t> content;
+    content.first = std::make_unique<std::byte[]>(value.size());
+    content.second = value.size();
+    memcpy(content.first.get(), value.data(), sizeof(char) * value.size());
+    tokenizer_.emplace(filePath_, std::move(content), compileState_, operatorLut_);
+
+    tokenizer_->errorCallback_ = [&](zax::ErrorTypes::Error error, zax::TokenPtr token) noexcept(false) {
+      handleException(error, token);
+    };
+  }
+
+  //-------------------------------------------------------------------------
+  Tokenizer& get() noexcept(false)
+  {
+    TEST(tokenizer_.has_value());
+    return *tokenizer_;
+  }
+
+  //-------------------------------------------------------------------------
+  const Tokenizer& get_const() const noexcept(false)
+  {
+    TEST(tokenizer_.has_value());
+    return *tokenizer_;
+  }
+
+  //-------------------------------------------------------------------------
+  void validate(const zax::TokenConstPtr& token) noexcept(false)
+  {
+    TEST(token->location_.filePath_ == filePath_);
+    TEST(token->compileState_ == compileState_);
+  }
+
+  //-------------------------------------------------------------------------
+  void validate(
+    const zax::TokenConstPtr& token,
+    int line,
+    int column) noexcept(false)
+  {
+    validate(token);
+    TEST(token->location_.line_ == line);
+    TEST(token->location_.column_ == column);
+  }
+
+  //-------------------------------------------------------------------------
+  void handleException(zax::ErrorTypes::Error error, zax::TokenPtr token) noexcept(false)
+  {
+    TEST(failures_.size() > 0);
+    
+    auto& front{ failures_.front() };
+    TEST(front.error_ == error);
+    TEST(front.line_ == token->location_.line_);
+    TEST(front.column_ == token->location_.column_);
+    failures_.pop_front();
+  }
+
+  //-------------------------------------------------------------------------
+  void expectError(zax::ErrorTypes::Error error, int line, int column) noexcept(false)
+  {
+    failures_.emplace_back(error, line, column);
+  }
+
+  //-------------------------------------------------------------------------
+  void simple() noexcept(false)
+  {
+    {
+      prepare("// comment");
+      auto iter{ std::begin(get()) };
+
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Comment);
+      TEST(token->originalToken_ == "// comment");
+      TEST(token->token_ == " comment");
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+    {
+      prepare("/* comment");
+      expectError(zax::ErrorTypes::Error::MissingEndOfComment, 1, 1);
+
+      auto iter{ std::begin(get()) };
+
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Comment);
+      TEST(token->originalToken_ == "/* comment");
+      TEST(token->token_ == " comment");
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+    {
+      prepare("/** comment");
+      expectError(zax::ErrorTypes::Error::MissingEndOfComment, 1, 1);
+
+      auto iter{ std::begin(get()) };
+
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Comment);
+      TEST(token->originalToken_ == "/** comment");
+      TEST(token->token_ == " comment");
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+    {
+      prepare(
+        "// comment\n"
+        "abc"
+      );
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        validate(token, 1, 1);
+        TEST(token->type_ == zax::Token::Type::Comment);
+        TEST(token->originalToken_ == "// comment");
+        TEST(token->token_ == " comment");
+      }
+      {
+        ++iter;
+        auto token{ *iter };
+        validate(token, 1, 50 - 40 + 1);
+        TEST(token->type_ == zax::Token::Type::Separator);
+        TEST(token->originalToken_ == "\n");
+        TEST(token->token_ == "\n");
+      }
+      {
+        ++iter;
+        auto token{ *iter };
+        validate(token, 2, 1);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "abc");
+        TEST(token->token_ == "abc");
+      }
+      {
+        ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void simple2() noexcept(false)
+  {
+    prepare(
+      "/* comment\n"
+      "*/abc"
+    );
+    auto iter{ std::begin(get()) };
+
+    {
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Comment);
+      TEST(token->originalToken_ == "/* comment\n*/");
+      TEST(token->token_ == " comment\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Separator);
+      TEST(token->originalToken_ == "/* comment\n*/");
+      TEST(token->token_ == " comment\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 3);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "abc");
+      TEST(token->token_ == "abc");
+    }
+    {
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void simple3() noexcept(false)
+  {
+    prepare(
+      "abc 134.4e+5+=foo\n"
+      "+++"
+    );
+    auto iter{ std::begin(get()) };
+
+    {
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "abc");
+      TEST(token->token_ == "abc");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 4);
+      TEST(token->type_ == zax::Token::Type::Number);
+      TEST(token->originalToken_ == "134.4e+5");
+      TEST(token->token_ == "134.4e+5");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 20-8+1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::PlusAssign);
+      TEST(token->originalToken_ == "+=");
+      TEST(token->token_ == "+=");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 22-8+1);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "foo");
+      TEST(token->token_ == "foo");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 25-8+1);
+      TEST(token->type_ == zax::Token::Type::Separator);
+      TEST(token->originalToken_ == "\n");
+      TEST(token->token_ == "\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::Constructor);
+      TEST(token->originalToken_ == "+++");
+      TEST(token->token_ == "+++");
+    }
+    {
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void simple4() noexcept(false)
+  {
+    prepare(
+      "abc 134.4e.5+=foo\n"
+      "+++'\"hello\"'"
+    );
+    expectError(zax::ErrorTypes::Error::ConstantSyntax, 1, 4);
+    auto iter{ std::begin(get()) };
+
+    {
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "abc");
+      TEST(token->token_ == "abc");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 4);
+      TEST(token->type_ == zax::Token::Type::Number);
+      TEST(token->originalToken_ == "134.4e");
+      TEST(token->token_ == "134.4e");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 18 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Number);
+      TEST(token->originalToken_ == ".5");
+      TEST(token->token_ == ".5");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 20 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::PlusAssign);
+      TEST(token->originalToken_ == "+=");
+      TEST(token->token_ == "+=");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 22 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "foo");
+      TEST(token->token_ == "foo");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 25 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Separator);
+      TEST(token->originalToken_ == "\n");
+      TEST(token->token_ == "\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::Constructor);
+      TEST(token->originalToken_ == "+++");
+      TEST(token->token_ == "+++");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 4);
+      TEST(token->type_ == zax::Token::Type::Quote);
+      TEST(token->originalToken_ == "'\"hello\"'");
+      TEST(token->token_ == "\"hello\"");
+    }
+    {
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void simple5() noexcept(false)
+  {
+    prepare(
+      "abc 134[[foo\n"
+      "+++\"\'hello\n"
+      "---``#%"
+    );
+    expectError(zax::ErrorTypes::Error::MissingEndOfQuote, 2, 4);
+    expectError(zax::ErrorTypes::Error::Syntax, 3, 4);
+    expectError(zax::ErrorTypes::Error::Syntax, 3, 6);
+    auto iter{ std::begin(get()) };
+    auto iterBogus{ std::begin(get()) };
+    TEST(iter == iterBogus);
+
+    {
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "abc");
+      TEST(token->token_ == "abc");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 4);
+      TEST(token->type_ == zax::Token::Type::Number);
+      TEST(token->originalToken_ == "134");
+      TEST(token->token_ == "134");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 15 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::DirectiveOpen);
+      TEST(token->originalToken_ == "[[");
+      TEST(token->token_ == "[[");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 17 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "foo");
+      TEST(token->token_ == "foo");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 20 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Separator);
+      TEST(token->originalToken_ == "\n");
+      TEST(token->token_ == "\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::Constructor);
+      TEST(token->originalToken_ == "+++");
+      TEST(token->token_ == "+++");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 4);
+      TEST(token->type_ == zax::Token::Type::Quote);
+      TEST(token->originalToken_ == "\"\'hello");
+      TEST(token->token_ == "\'hello");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 20 - 8 + 1 - 2);
+      TEST(token->type_ == zax::Token::Type::Separator);
+      TEST(token->originalToken_ == "\n");
+      TEST(token->token_ == "\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 3, 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::Destructor);
+      TEST(token->originalToken_ == "---");
+      TEST(token->token_ == "---");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 3, 14-8+1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::Modulus);
+      TEST(token->originalToken_ == "%");
+      TEST(token->token_ == "%");
+    }
+    {
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void simple6() noexcept(false)
+  {
+    prepare(
+      "/* comment\n"
+      "*/abc\xE2\x82\xAC"
+    );
+    auto iter{ std::begin(get_const()) };
+
+    {
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Comment);
+      TEST(token->originalToken_ == "/* comment\n*/");
+      TEST(token->token_ == " comment\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 1, 1);
+      TEST(token->type_ == zax::Token::Type::Separator);
+      TEST(token->originalToken_ == "/* comment\n*/");
+      TEST(token->token_ == " comment\n");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 2, 3);
+      TEST(token->type_ == zax::Token::Type::Literal);
+      TEST(token->originalToken_ == "abc\xE2\x82\xAC");
+      TEST(token->token_ == "abc\xE2\x82\xAC");
+    }
+    {
+      ++iter;
+      TEST(iter == std::end(get()));
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void simple7() noexcept(false)
+  {
+    prepare(
+      "/* comment\n"
+      "*/abc"
+    );
+    auto iter{ std::end(get()) };
+    TEST(iter == std::end(get()));
+    ++iter;
+    TEST(iter == std::end(get()));
+  }
+
+  //-------------------------------------------------------------------------
+  void simple8() noexcept(false)
+  {
+    prepare(
+      "/* comment\n"
+      "*/abc"
+    );
+    auto iter{ std::end(get_const()) };
+    TEST(iter == std::cend(get_const()));
+    ++iter;
+    TEST(iter == std::end(get_const()));
+
+    TEST(get_const().hasAhead(std::cbegin(get_const()), 2));
+    TEST(!get().hasAhead(std::begin(get()), 3));
+    TEST(std::begin(get_const()) == std::cbegin(get_const()));
+  }
+
+  //-------------------------------------------------------------------------
+  TokenPtr makeToken(std::string_view str) noexcept
+  {
+    auto result{ std::make_shared<Token>() };
+    result->token_ = str;
+    return result;
+  }
+
+  std::vector<std::string_view> compareVector_{ "A", "1.1", "C", "--", "E", "&&", "G", "+++", "++", "J", "K", "L", "M", "(", ")", "P", "^^", "R", "$", "T", "]]", "@@", "W", "X", ",", "Z" };
+
+  //-------------------------------------------------------------------------
+  std::vector<std::string_view>  makeVector(size_t firstLet, size_t lastLet) noexcept(false)
+  {
+    assert(firstLet <= lastLet);
+    auto temp{ compareVector_ };
+    if (0 != firstLet) {
+      temp.erase(begin(temp), begin(temp) + firstLet);
+      lastLet -= firstLet;
+    }
+    if (lastLet <= temp.size()) {
+      temp.erase(begin(temp) + lastLet, end(temp));
+    }
+    return temp;
+  }
+
+  //-------------------------------------------------------------------------
+  void checkEmpty(Tokenizer& tokens) noexcept(false)
+  {
+    TEST(tokens.empty());
+    TEST(tokens.size() == 0);
+    {
+      auto temp1{ zax::extract(tokens.begin(), tokens.end()) };
+      TEST(temp1.empty());
+      auto temp2{ zax::extract(tokens.begin(), 500) };
+      TEST(temp2.empty());
+      auto temp3{ zax::extractFromStartToPos(tokens.begin()) };
+      TEST(temp3.empty());
+      auto temp4{ zax::extractFromStartToPos(tokens.end()) };
+      TEST(temp4.empty());
+      auto temp5{ zax::extractFromPosToEnd(tokens.begin()) };
+      TEST(temp5.empty());
+      auto temp6{ zax::extractFromPosToEnd(tokens.end()) };
+      TEST(temp6.empty());
+      zax::erase(tokens.begin());
+      zax::erase(tokens.end());
+    }
+    {
+      auto temp1{ tokens.extract(tokens.begin(), tokens.end()) };
+      TEST(temp1.empty());
+      auto temp2{ tokens.extract(tokens.begin(), 500) };
+      TEST(temp2.empty());
+      auto temp3{ tokens.extractFromStartToPos(tokens.begin()) };
+      TEST(temp3.empty());
+      auto temp4{ tokens.extractFromStartToPos(tokens.end()) };
+      TEST(temp4.empty());
+      auto temp5{ tokens.extractFromPosToEnd(tokens.begin()) };
+      TEST(temp5.empty());
+      auto temp6{ tokens.extractFromPosToEnd(tokens.end()) };
+      TEST(temp6.empty());
+      tokens.erase(tokens.begin());
+      tokens.erase(tokens.end());
+    }
+    TEST(!tokens.popFront());
+    TEST(!tokens.popBack());
+
+    zax::TokenList newTokens;
+
+    tokens.extractThenPushFront(newTokens);
+    tokens.extractThenPushBack(newTokens);
+
+    tokens.copyPushFront(newTokens);
+    tokens.copyPushBack(newTokens);
+
+    TEST(!tokens[0]);
+    TEST(tokens.at(0) == tokens.end());
+
+    TEST(tokens.begin() == tokens.end());
+    TEST(tokens.cbegin() == tokens.cend());
+
+    TEST(tokens.empty());
+    TEST(tokens.size() == 0);
+  }
+
+  //-------------------------------------------------------------------------
+  void checkList(Tokenizer& list, std::vector<std::string_view>&& vector) noexcept(false)
+  {
+    if (vector.size() < 1) {
+      checkEmpty(list);
+      return;
+    }
+    TEST(!list.empty());
+    TEST(zax::hasAhead(std::begin(list), vector.size() - 1));
+    TEST(list.hasAhead(std::begin(list), vector.size() - 1));
+    TEST(!list.hasAhead(std::begin(list), vector.size()));
+    TEST(zax::hasBehind(std::end(list), vector.size() - 1));
+    TEST(list.hasBehind(std::end(list), vector.size() - 1));
+    TEST(!zax::hasAhead(std::begin(list), vector.size()));
+    TEST(zax::hasBehind(std::end(list), vector.size()));
+    TEST(!zax::hasBehind(std::end(list), vector.size()) + 1);
+    TEST(list.hasBehind(std::end(list), vector.size()));
+    TEST(!list.hasBehind(std::end(list), vector.size()) + 1);
+    TEST(list.size() == vector.size());
+    size_t count = 0;
+    for (auto value : list) {
+      TEST(value->token_ == vector[count]);
+      ++count;
+    }
+    TEST(count == vector.size());
+  }
+
+  //-------------------------------------------------------------------------
+  void checkEmpty(zax::TokenList& tokens) noexcept(false)
+  {
+    TEST(tokens.empty());
+    TEST(tokens.size() == 0);
+  }
+
+  //-------------------------------------------------------------------------
+  void checkList(zax::TokenList& list, std::vector<std::string_view>&& vector) noexcept(false)
+  {
+    if (vector.size() < 1) {
+      checkEmpty(list);
+      return;
+    }
+    TEST(!list.empty());
+    TEST(zax::hasAhead(std::begin(list), vector.size() - 1));
+    TEST(list.hasAhead(std::begin(list), vector.size() - 1));
+    TEST(!list.hasAhead(std::begin(list), vector.size()));
+    TEST(zax::hasBehind(std::end(list), vector.size() - 1));
+    TEST(list.hasBehind(std::end(list), vector.size() - 1));
+    TEST(!zax::hasAhead(std::begin(list), vector.size()));
+    TEST(zax::hasBehind(std::end(list), vector.size()));
+    TEST(!zax::hasBehind(std::end(list), vector.size()) + 1);
+    TEST(list.hasBehind(std::end(list), vector.size()));
+    TEST(!list.hasBehind(std::end(list), vector.size()) + 1);
+    TEST(list.size() == vector.size());
+    size_t count = 0;
+    for (auto value : list) {
+      TEST(value->token_ == vector[count]);
+      ++count;
+    }
+    TEST(count == vector.size());
+  }
+
+  //-------------------------------------------------------------------------
+  void simple9() noexcept(false)
+  {
+    prepare("");
+    auto iter{ std::end(get()) };
+    TEST(std::begin(get()) == std::end(get()));
+    ++iter;
+    TEST(iter == std::end(get()));
+    checkEmpty(get());
+  }
+
+  //-------------------------------------------------------------------------
+  void simple10() noexcept(false)
+  {
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto result1{ list.extractFromStartToPos(4) };
+      checkList(list, makeVector(4, 26));
+      checkList(result1, makeVector(0, 4));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto result1{ list.extractFromPosToEnd(4) };
+      checkList(list, makeVector(0, 4));
+      checkList(result1, makeVector(4, 26));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+
+      auto& list{ get() };
+
+      // lazy iteration so only the current and "next"
+      // prepared
+      auto result1{ list.extractFromPosToEnd(4) };
+      checkList(result1, makeVector(4, 5));
+
+      auto vec1{ makeVector(0, 4) };
+      auto vec2{ makeVector(5, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      list.erase(4);
+      auto vec1{ makeVector(0, 4) };
+      auto vec2{ makeVector(5, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      list.pushFront(makeToken("new"));
+      std::vector<std::string_view> vec1{ "new" };
+      auto vec2{ makeVector(0, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto tmp{ makeToken("new") };
+      list.pushFront(tmp);
+      std::vector<std::string_view> vec1{ "new" };
+      auto vec2{ makeVector(0, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      list.pushBack(makeToken("new"));
+      auto vec1{ makeVector(0, 26) };
+      std::vector<std::string_view> vec2{ "new" };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto tmp{ makeToken("new") };
+      list.pushBack(tmp);
+      auto vec1{ makeVector(0, 26) };
+      std::vector<std::string_view> vec2{ "new" };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto result{ list.popFront() };
+      TEST(result->token_ == "A");
+      checkList(list, makeVector(1, 26));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.extractThenPushFront(tokens);
+      checkEmpty(tokens);
+
+      auto vec2{ makeVector(0, 26) };
+      std::vector<std::string_view> vec1{ "a", "b" };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.extractThenPushFront(std::move(tokens));
+      checkEmpty(tokens);
+
+      auto vec2{ makeVector(0, 26) };
+      std::vector<std::string_view> vec1{ "a", "b" };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.extractThenPushBack(tokens);
+      checkEmpty(tokens);
+
+      auto vec1{ makeVector(0, 26) };
+      std::vector<std::string_view> vec2{ "a", "b" };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.extractThenPushBack(std::move(tokens));
+      checkEmpty(tokens);
+
+      auto vec1{ makeVector(0, 26) };
+      std::vector<std::string_view> vec2{ "a", "b" };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.copyPushFront(tokens);
+
+      auto vec2{ makeVector(0, 26) };
+      std::vector<std::string_view> vec1{ "a", "b" };
+      checkList(tokens, std::move(vec1));
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.copyPushBack(tokens);
+
+      auto vec1{ makeVector(0, 26) };
+      std::vector<std::string_view> vec2{ "a", "b" };
+      checkList(tokens, std::move(vec2));
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      auto& list{ get() };
+      TEST(list[3]->token_ == "--");
+      checkList(list, makeVector(0,26));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      auto& list{ get() };
+      TEST((*list.at(3))->token_ == "--");
+      checkList(list, makeVector(0, 26));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      auto& list{ get_const() };
+      TEST((*list.at(3))->token_ == "--");
+      checkList(get(), makeVector(0, 26));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto extracted{ list.extract(list.at(1), list.at(4)) };
+
+      auto vec1{ makeVector(0, 1) };
+      auto vec2{ makeVector(4, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+      checkList(extracted, makeVector(1, 4));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto extracted{ list.extract(list.at(1), 3) };
+
+      auto vec1{ makeVector(0, 1) };
+      auto vec2{ makeVector(4, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+      checkList(extracted, makeVector(1, 4));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto extracted{ list.extractFromStartToPos(list.at(3)) };
+
+      checkList(list, makeVector(3, 26));
+      checkList(extracted, makeVector(0, 3));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto extracted{ list.extractFromPosToEnd(list.at(3)) };
+
+      checkList(list, makeVector(0, 3));
+      checkList(extracted, makeVector(3, 26));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      list.erase(list.at(1), list.at(3));
+
+      auto vec1{ makeVector(0, 1) };
+      auto vec2{ makeVector(3, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      list.erase(list.at(1));
+
+      auto vec1{ makeVector(0, 1) };
+      auto vec2{ makeVector(2, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      list.erase(list.at(1), 2);
+
+      auto vec1{ makeVector(0, 1) };
+      auto vec2{ makeVector(3, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto tmp{ makeToken("a") };
+      list.insertBefore(list.at(2), tmp);
+
+      auto vec1{ makeVector(0, 2) };
+      std::vector<std::string_view> vec2{ "a" };
+      auto vec3{ makeVector(2, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      vec1.insert(vec1.end(), vec3.begin(), vec3.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto tmp{ makeToken("a") };
+      list.insert(list.at(2), tmp);
+
+      auto vec1{ makeVector(0, 2) };
+      std::vector<std::string_view> vec2{ "a" };
+      auto vec3{ makeVector(2, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      vec1.insert(vec1.end(), vec3.begin(), vec3.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      auto& list{ get() };
+      auto tmp{ makeToken("a") };
+      list.insertAfter(list.at(2), tmp);
+
+      auto vec1{ makeVector(0, 3) };
+      std::vector<std::string_view> vec2{ "a" };
+      auto vec3{ makeVector(3, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      vec1.insert(vec1.end(), vec3.begin(), vec3.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.insertCopyBefore(list.at(3), tokens);
+
+      auto vec1{ makeVector(0, 3) };
+      std::vector<std::string_view> vec2{ "a", "b" };
+      auto vec3{ makeVector(3, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      vec1.insert(vec1.end(), vec3.begin(), vec3.end());
+      checkList(list, std::move(vec1));
+    }
+    {
+      prepare(
+        "A 1.1 C--E&&G+++++J K L M ()P^^R$T ]]@@ W X,Z"
+      );
+      checkList(get(), makeVector(0, 26));
+
+      zax::TokenList tokens;
+      tokens.pushBack(makeToken("a"));
+      tokens.pushBack(makeToken("b"));
+
+      auto& list{ get() };
+      list.insertCopyAfter(list.at(3), tokens);
+
+      auto vec1{ makeVector(0, 4) };
+      std::vector<std::string_view> vec2{ "a", "b" };
+      auto vec3{ makeVector(4, 26) };
+      vec1.insert(vec1.end(), vec2.begin(), vec2.end());
+      vec1.insert(vec1.end(), vec3.begin(), vec3.end());
+      checkList(list, std::move(vec1));
+    }
+
+  }
+
+  //-------------------------------------------------------------------------
+  void runAll() noexcept(false)
+  {
+    auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
+
+    runner([&]() { simple(); });
+    runner([&]() { simple2(); });
+    runner([&]() { simple3(); });
+    runner([&]() { simple4(); });
+    runner([&]() { simple5(); });
+    runner([&]() { simple6(); });
+    runner([&]() { simple7(); });
+    runner([&]() { simple8(); });
+    //runner([&]() { simple9(); });
+    runner([&]() { simple10(); });
+
+    reset();
+  }
+};
+
+//---------------------------------------------------------------------------
 void testTokenizer() noexcept(false)
 {
   TokenizerBasics{}.runAll();
+  TokenizerInstance{}.runAll();
 }
 
 } // namespace zaxTest

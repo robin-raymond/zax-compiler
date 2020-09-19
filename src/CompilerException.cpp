@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "CompilerException.h"
 #include "Token.h"
+#include "CompileState.h"
 #include "SourceFilePath.h"
 #include "helpers.h"
 
@@ -26,10 +27,12 @@ void zax::output(InformationalTypes::Informational informational, TokenPtr token
 }
 
 //-----------------------------------------------------------------------------
-void zax::output(WarningTypes::Warning warning, bool treatAsError, TokenPtr token, const StringMap& params) noexcept
+void zax::output(WarningTypes::Warning warning, TokenPtr token, const StringMap& params) noexcept
 {
   assert(token);
   assert(token->location_.filePath_);
+  assert(token->compileState_);
+  bool treatAsError{ token->compileState_->isWarningAnError(warning) };
 
   zax::output(
     CompilerException{

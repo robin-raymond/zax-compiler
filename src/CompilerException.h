@@ -109,7 +109,6 @@ void output(
   const StringMap& params = {}) noexcept;
 void output(
   WarningTypes::Warning warning,
-  bool treatAsError,
   TokenPtr token,
   const StringMap& params = {}) noexcept;
 void output(ErrorTypes::Error error,

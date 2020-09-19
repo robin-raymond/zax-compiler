@@ -206,8 +206,7 @@ public:
     auto& operator++() noexcept
     {
       if (list_) {
-        if (iterator_ != list_->tokenListEnd())
-          list_->advance(iterator_);
+        list_->advance(iterator_);
       }
       return *this;
     }
@@ -439,6 +438,8 @@ public:
   void insertCopyAfter(iterator pos, const TokenList& rhs) noexcept;
 
 private:
+  void ensurePosExists(index_type pos) noexcept;
+  void ensurePosExists(index_type pos) const noexcept;
 };
 
 
