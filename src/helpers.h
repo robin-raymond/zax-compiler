@@ -52,6 +52,12 @@ String locateFile(
   String& outFullFilePath,
   bool useAbsolutePath = false) noexcept;
 
+void locateWildCardFiles(
+  std::list<std::pair<String, String>>& outFoundFilePaths,
+  const StringView currentFile,
+  const StringView newFileWithWildCards,
+  bool useAbsolutePath = false) noexcept;
+
 std::map<size_t, StringView> stringSplitView(
   const StringView input,
   const StringView splitStr) noexcept;

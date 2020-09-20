@@ -87,7 +87,7 @@ String zax::makeIncludeFile(
   String currentFile{ inCurrentFile };
   String newFile{ inNewFile };
 
-  std::error_code ec;
+  std::error_code ec{};
   outFullFilePath = {};
 
 #ifdef _WIN32
@@ -148,10 +148,10 @@ String zax::locateFile(
   bool useAbsolutePath) noexcept
 {
   outFullFilePath = {};
+  std::error_code ec{};
   std::filesystem::path currentFilePath{ currentFile };
   std::filesystem::path parentCurrentFile{ currentFilePath.parent_path() };
   if (useAbsolutePath) {
-    std::error_code ec;
     parentCurrentFile = std::filesystem::absolute(parentCurrentFile, ec);
     if (ec)
       return outFullFilePath;
@@ -161,7 +161,7 @@ String zax::locateFile(
     String fullPath;
     auto usePath{ parentCurrentFile / currentFilePath.filename() };
     auto result{ makeIncludeFile(usePath.string(), newFile, fullPath) };
-    if (std::filesystem::is_regular_file(std::filesystem::path{ result })) {
+    if (std::filesystem::is_regular_file(std::filesystem::path{ result }, ec)) {
       outFullFilePath = fullPath;
       return result;
     }
@@ -174,6 +174,192 @@ String zax::locateFile(
     parentCurrentFile = parentCurrentFile.parent_path();
   }
   return {};
+}
+
+//-----------------------------------------------------------------------------
+void zax::locateWildCardFiles(
+  std::list<std::pair<String, String>>& outFoundFilePaths,
+  const StringView currentFile,
+  const StringView newFileWithWildCards,
+  bool useAbsolutePath) noexcept
+{
+  using Path = std::filesystem::path;
+  using PathList = std::list<Path>;
+
+  struct HasWild {
+    static bool hasWild(const StringView str) noexcept {
+      return (!((StringView::npos == str.find("*")) &&
+                (StringView::npos == str.find("?"))));
+    }
+  };
+
+  if (!HasWild::hasWild(newFileWithWildCards)) {
+    String outFullFilePath;
+    String result{ locateFile(currentFile, newFileWithWildCards, outFullFilePath) };
+    outFoundFilePaths.push_back(std::make_pair(result, outFullFilePath));
+    return;
+  }
+
+  std::error_code ec{};
+  Path currentFilePath{ currentFile };
+  Path parentCurrentFile{ currentFilePath.parent_path() };
+  if (useAbsolutePath) {
+    parentCurrentFile = std::filesystem::absolute(parentCurrentFile, ec);
+    if (ec)
+      return;
+  }
+
+  while (true) {
+    String fullPath;
+    auto usePath{ parentCurrentFile / currentFilePath.filename() };
+    auto result{ makeIncludeFile(usePath.string(), newFileWithWildCards, fullPath) };
+
+    // break out all wild cards into components
+    Path basePath{ result };
+    PathList exploreComponents;
+    while (true) {
+      Path parent{ basePath.parent_path() };
+      Path relative{ std::filesystem::proximate(basePath, parent, ec) };
+      exploreComponents.push_front(relative);
+      basePath = parent;
+      if (!HasWild::hasWild(basePath.string()))
+        break;
+    }
+
+    struct WildMatcher {
+      static void wildMatch(
+        PathList& outFoundFiles,
+        Path basePath,
+        PathList exploreComponents) noexcept {
+        std::error_code ec{};
+
+        if (exploreComponents.empty()) {
+          if (std::filesystem::is_regular_file(basePath, ec))
+            outFoundFiles.push_back(basePath);
+          return;
+        }
+
+        Path matchEntry{ exploreComponents.front() };
+        exploreComponents.pop_front();
+
+        if (!HasWild::hasWild(matchEntry.string())) {
+          basePath /= matchEntry;
+          return wildMatch(outFoundFiles, basePath, exploreComponents);
+        }
+
+        // wild card matching is required
+
+        PathList entries;
+        for (auto& p : std::filesystem::directory_iterator(basePath, ec)) {
+          auto foundPath{ p.path() };
+          auto usePath{ std::filesystem::proximate(foundPath, basePath, ec) };
+          if (usePath.empty())
+            continue;
+          entries.push_back(usePath);
+        }
+
+        struct HumbleMatcher {
+          static bool humbleMatch(
+            PathList& outFoundFiles,
+            PathList& exploreComponents,
+            const Path& basePath,
+            const Path& matchEntry,
+            const Path& entry,
+            decltype(String::npos) greediness) {
+            String wildStr{ matchEntry.string() };
+            auto posQuestion{ wildStr.find("?") };
+            auto posStar{ wildStr.find("*") };
+            auto posFirst{ String::npos == posQuestion ? posStar : ( String::npos == posStar ? posQuestion : std::min(posStar, posQuestion) ) };
+            if (String::npos == posFirst) {
+              if (0 != matchEntry.compare(entry))
+                return false;
+              // no more wild card, direct match check
+              auto useBasePath{ basePath / entry };
+              wildMatch(outFoundFiles, useBasePath, exploreComponents);
+              return true;
+            }
+
+            String entryStr{ entry.string() };
+
+            StringView wp{ wildStr };
+            StringView es{ entryStr };
+
+            StringView prefixWp{ wp.substr(0, posFirst) };
+            if (es.length() < prefixWp.length())
+              return false;
+
+            // prefixes must match or not a match
+            if (prefixWp.size() > 0) {
+              if (0 != Path{ prefixWp }.compare(Path{ es.substr(0, prefixWp.length()) }))
+                return false;
+            }
+
+            auto rehumble{ [&](decltype(String::npos) useGreed, bool increaseGreed) noexcept -> bool {
+              // impossible match?
+              if (es.length() < posFirst + useGreed)
+                return false;
+              if (wp.length() < posFirst + 1)
+                return false;
+
+              StringView borrowStr{ useGreed > 0 ? es.substr(posFirst, useGreed) : StringView{} };
+              StringView postfixWp{ wp.substr(posFirst + 1) }; // account for the extracted wild character
+              StringView postfixEs{ es.substr(posFirst + useGreed) }; // account for the borrowed string
+
+              String useMatchStr;
+              useMatchStr.reserve(prefixWp.size() + borrowStr.size() + postfixWp.size());
+              String useEsStr;
+              useEsStr.reserve(prefixWp.size() + borrowStr.size() + postfixEs.size());
+
+              useMatchStr += prefixWp;
+              useMatchStr += borrowStr;
+              useMatchStr += postfixWp;
+
+              useEsStr += prefixWp;
+              useEsStr += borrowStr;
+              useEsStr += postfixEs;
+              if (humbleMatch(outFoundFiles, exploreComponents, basePath, Path{ useMatchStr }, Path{ useEsStr }, 0))
+                return true;
+              if (!increaseGreed)
+                return false;
+              return humbleMatch(outFoundFiles, exploreComponents, basePath, matchEntry, entry, useGreed + 1);
+            } };
+
+            if (posFirst == posQuestion)
+              return rehumble(1, false);
+            return rehumble(greediness, true);
+          }
+        };
+
+        for (auto& checkEntry : entries) {
+          HumbleMatcher::humbleMatch(outFoundFiles, exploreComponents, basePath, matchEntry, checkEntry , 0);
+        }
+      }
+    };
+
+    PathList foundResults;
+    WildMatcher::wildMatch(foundResults, basePath, exploreComponents);
+
+    if (foundResults.size() > 0) {
+      for (auto& path : foundResults) {
+
+        assert(std::filesystem::is_regular_file(path, ec));
+        auto absPath = std::filesystem::absolute(path, ec);
+
+        outFoundFilePaths.push_back(std::make_pair(path.string(), absPath.string()));
+      }
+      return;
+    }
+
+    if (!parentCurrentFile.has_relative_path()) {
+      if (!useAbsolutePath) {
+        locateWildCardFiles(outFoundFilePaths, currentFile, newFileWithWildCards, true);
+        return;
+      }
+      break;
+    }
+
+    parentCurrentFile = parentCurrentFile.parent_path();
+  }
 }
 
 //-----------------------------------------------------------------------------

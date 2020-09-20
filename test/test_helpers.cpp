@@ -102,11 +102,55 @@ struct HelperBasics
   }
 
   //-------------------------------------------------------------------------
+  void testWildCard() noexcept(false)
+  {
+    const std::string path1{ "ignored/test/fruit/apple_fruit" };
+    const std::string path2{ "ignored/test/fruit/banana_fruit" };
+    const std::string path3{ "ignored/test/fruit/caraway_seed" };
+    const std::string path4{ "ignored/test/fruit/dandy_seed" };
+
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path{ path1 }, ec);
+    std::filesystem::create_directories(std::filesystem::path{ path2 }, ec);
+    std::filesystem::create_directories(std::filesystem::path{ path3 }, ec);
+    std::filesystem::create_directories(std::filesystem::path{ path4 }, ec);
+
+    TEST(zax::writeBinaryFile(path1 + "/hello.txt", "hello1"));
+    TEST(zax::writeBinaryFile(path1 + "/helloa.txt", "hello2"));
+    TEST(zax::writeBinaryFile(path1 + "/helloab.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path1 + "/hellobbc.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path1 + "/helloabc.txt", "hello4"));
+    TEST(zax::writeBinaryFile(path2 + "/hello.txt", "hello1"));
+    TEST(zax::writeBinaryFile(path2 + "/helloa.txt", "hello2"));
+    TEST(zax::writeBinaryFile(path2 + "/helloab.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path2 + "/hellobbc.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path2 + "/helloabc.txt", "hello4"));
+    TEST(zax::writeBinaryFile(path3 + "/hello.txt", "hello1"));
+    TEST(zax::writeBinaryFile(path3 + "/helloa.txt", "hello2"));
+    TEST(zax::writeBinaryFile(path3 + "/helloab.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path3 + "/hellobbc.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path3 + "/helloabc.txt", "hello4"));
+    TEST(zax::writeBinaryFile(path4 + "/hello.txt", "hello1"));
+    TEST(zax::writeBinaryFile(path4 + "/helloa.txt", "hello2"));
+    TEST(zax::writeBinaryFile(path4 + "/helloab.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path4 + "/hellobbc.txt", "hello3"));
+    TEST(zax::writeBinaryFile(path4 + "/helloabc.txt", "hello4"));
+
+    std::list<std::pair<std::string, std::string>> found;
+    zax::locateWildCardFiles(found, "ignored/fruit/apple_fruit/test.txt", "test/fr*/*_?ruit/hello*.txt");
+    
+    TEST(found.size() == 10);
+
+    output(__FILE__ "::" __FUNCTION__);
+  }
+
+  //-------------------------------------------------------------------------
   void runAll() noexcept(false)
   {
     auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
 
     runner([&]() { test(); });
+    runner([&]() { testWildCard(); });
 
     reset();
   }
