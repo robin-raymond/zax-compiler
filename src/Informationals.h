@@ -11,24 +11,27 @@ struct InformationalTypes
 {
   enum class Informational
   {
+    ActualOrigin,
     ToDo
   };
 
-  struct InformationalDeclare final : public zs::EnumDeclare<Informational, 1>
+  struct InformationalDeclare final : public zs::EnumDeclare<Informational, 2>
   {
     constexpr const Entries operator()() const noexcept
     {
       return { {
+        {Informational::ActualOrigin, "origin"},
         {Informational::ToDo, "to-do"}
       } };
     }
   };
 
-  struct InformationalHumanReadableDeclare final : public zs::EnumDeclare<Informational, 1>
+  struct InformationalHumanReadableDeclare final : public zs::EnumDeclare<Informational, 2>
   {
     constexpr const Entries operator()() const noexcept
     {
       return { {
+        {Informational::ActualOrigin, "origin"},
         {Informational::ToDo, "to-do"}
       } };
     }

@@ -12,7 +12,7 @@ StringView makeStringView(const char* start, const char* end) noexcept;
 std::pair< std::unique_ptr<std::byte[]>, size_t> readBinaryFile(const StringView fileName) noexcept;
 
 bool writeBinaryFile(
-  const String fileName,
+  const StringView fileName,
   const std::byte* source,
   size_t length) noexcept;
 
@@ -27,7 +27,7 @@ inline bool writeBinaryFile(
 }
 
 inline bool writeBinaryFile(
-  const String fileName,
+  const StringView fileName,
   const std::uint8_t* source,
   size_t length) noexcept
 {
@@ -38,28 +38,47 @@ inline bool writeBinaryFile(
 }
 
 String makeIncludeFile(
-  const String& currentFile,
-  const String& newFile,
-  String& outFullPathFileName) noexcept;
+  const StringView currentFile,
+  const StringView newFile,
+  String& outFullFilePath) noexcept;
+
+String fileAndPathFromFilePath(
+  const StringView filePath,
+  String& outParentFilePath) noexcept;
+
+String locateFile(
+  const StringView currentFile,
+  const StringView newFile,
+  String& outFullFilePath,
+  bool useAbsolutePath = false) noexcept;
 
 std::map<size_t, StringView> stringSplitView(
-  const StringView& input,
-  const StringView& splitStr) noexcept;
+  const StringView input,
+  const StringView splitStr) noexcept;
 
 std::map<size_t, String> stringSplit(
-  const StringView& input,
-  const StringView& splitStr) noexcept;
+  const StringView input,
+  const StringView splitStr) noexcept;
 
 String stringMerge(
   const std::map<size_t, String>& input,
-  const StringView& splitStr) noexcept;
+  const StringView splitStr) noexcept;
 
 String stringMerge(
   const std::map<size_t, StringView>& input,
-  const StringView& splitStr) noexcept;
+  const StringView splitStr) noexcept;
 
 String stringReplace(
-  const StringView& input,
+  const StringView input,
   const StringMap& mapping) noexcept;
+
+String stringReplace(
+  const StringView input,
+  const StringViewMap& mapping) noexcept;
+
+String stringReplace(
+  const StringView input,
+  const StringView search,
+  const StringView replace) noexcept;
 
 } // namespace zax

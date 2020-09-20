@@ -21,7 +21,6 @@ StringView zax::makeStringView(const char* start, const char* end) noexcept {
   return StringView{ start, SafeInt<size_t>(end - start) };
 }
 
-
 //-----------------------------------------------------------------------------
 std::pair<std::unique_ptr<std::byte[]>, size_t> zax::readBinaryFile(const StringView fileName) noexcept
 {
@@ -51,7 +50,7 @@ std::pair<std::unique_ptr<std::byte[]>, size_t> zax::readBinaryFile(const String
 
 //-----------------------------------------------------------------------------
 bool zax::writeBinaryFile(
-  const String fileName,
+  const StringView fileName,
   const std::byte* source,
   size_t length) noexcept
 {
@@ -81,37 +80,106 @@ abandon:
 
 //-----------------------------------------------------------------------------
 String zax::makeIncludeFile(
-  const String& inCurrentFile,
-  const String& inNewFile,
-  String& outFullPathFileName) noexcept
+  const StringView inCurrentFile,
+  const StringView inNewFile,
+  String& outFullFilePath) noexcept
 {
-  String currentFile = inCurrentFile;
-  String newFile = inNewFile;
+  String currentFile{ inCurrentFile };
+  String newFile{ inNewFile };
+
+  std::error_code ec;
+  outFullFilePath = {};
 
 #ifdef _WIN32
   std::replace(currentFile.begin(), currentFile.end(), '/', '\\');
   std::replace(newFile.begin(), newFile.end(), '/', '\\');
 #endif //_WIN32
 
-  auto absFilePath = std::filesystem::absolute(currentFile);
+  std::filesystem::path newFilePath{ newFile };
+  if (newFilePath.has_root_path()) {
+    outFullFilePath = std::filesystem::absolute(newFilePath, ec).string();
+    if (ec)
+      return outFullFilePath;
+  }
+
+  auto absFilePath = std::filesystem::absolute(currentFile, ec);
+  if (ec)
+    return outFullFilePath;
   absFilePath.remove_filename();
 
-  auto relPath = std::filesystem::proximate(newFile, absFilePath);
-  auto newPath = absFilePath / relPath;
+  auto newPath = absFilePath / newFilePath;
+  auto fullPath{ std::filesystem::absolute(newPath, ec) };
+  if (ec)
+    return outFullFilePath;
 
-  auto currentPath = std::filesystem::current_path();
-  auto newRelPath = std::filesystem::proximate(newPath, currentPath);
 
-  outFullPathFileName = std::filesystem::absolute(newRelPath).string();
+  auto relPath = std::filesystem::proximate(fullPath, absFilePath, ec);
+  if (ec)
+    return outFullFilePath;
 
+  auto currentPath = std::filesystem::current_path(ec);
+  if (ec)
+    return outFullFilePath;
+
+  auto newRelPath = std::filesystem::proximate(newPath, currentPath, ec);
+  if (ec)
+    return outFullFilePath;
+
+  outFullFilePath = fullPath.string();
   return newRelPath.string();
 }
 
+//-----------------------------------------------------------------------------
+String zax::fileAndPathFromFilePath(
+  const StringView filePath,
+  String& outParentFilePath) noexcept
+{
+  std::filesystem::path path{ filePath };
+
+  outParentFilePath = path.parent_path().string();
+  return path.filename().string();
+}
+
+//-----------------------------------------------------------------------------
+String zax::locateFile(
+  const StringView currentFile,
+  const StringView newFile,
+  String& outFullFilePath,
+  bool useAbsolutePath) noexcept
+{
+  outFullFilePath = {};
+  std::filesystem::path currentFilePath{ currentFile };
+  std::filesystem::path parentCurrentFile{ currentFilePath.parent_path() };
+  if (useAbsolutePath) {
+    std::error_code ec;
+    parentCurrentFile = std::filesystem::absolute(parentCurrentFile, ec);
+    if (ec)
+      return outFullFilePath;
+  }
+
+  while (true) {
+    String fullPath;
+    auto usePath{ parentCurrentFile / currentFilePath.filename() };
+    auto result{ makeIncludeFile(usePath.string(), newFile, fullPath) };
+    if (std::filesystem::is_regular_file(std::filesystem::path{ result })) {
+      outFullFilePath = fullPath;
+      return result;
+    }
+    if (!parentCurrentFile.has_relative_path()) {
+      if (!useAbsolutePath)
+        return locateFile(currentFile, newFile, outFullFilePath, true);
+      break;
+    }
+
+    parentCurrentFile = parentCurrentFile.parent_path();
+  }
+  return {};
+}
 
 //-----------------------------------------------------------------------------
 std::map<size_t, StringView> zax::stringSplitView(
-  const StringView& input,
-  const StringView& splitStr) noexcept
+  const StringView input,
+  const StringView splitStr) noexcept
 {
   std::map<size_t, StringView> outResult;
 
@@ -151,9 +219,9 @@ std::map<size_t, StringView> zax::stringSplitView(
 }
 
 //-----------------------------------------------------------------------------
-std::map<size_t, String> stringSplit(
-  const StringView& input,
-  const StringView& splitStr) noexcept
+std::map<size_t, String> zax::stringSplit(
+  const StringView input,
+  const StringView splitStr) noexcept
 {
   std::map<size_t, String> outResult;
 
@@ -195,7 +263,7 @@ std::map<size_t, String> stringSplit(
 //-----------------------------------------------------------------------------
 String zax::stringMerge(
   const std::map<size_t, String>& input,
-  const StringView& splitStr) noexcept
+  const StringView splitStr) noexcept
 {
   if (input.size() < 1)
     return {};
@@ -222,7 +290,7 @@ String zax::stringMerge(
 //-----------------------------------------------------------------------------
 String zax::stringMerge(
   const std::map<size_t, StringView>& input,
-  const StringView& splitStr) noexcept
+  const StringView splitStr) noexcept
 {
   if (input.size() < 1)
     return {};
@@ -248,7 +316,7 @@ String zax::stringMerge(
 
 //-----------------------------------------------------------------------------
 String zax::stringReplace(
-  const StringView& input,
+  const StringView input,
   const StringMap& mapping) noexcept
 {
   if (mapping.size() < 1)
@@ -266,6 +334,55 @@ String zax::stringReplace(
       output.replace(pos, search.length(), replace);
       lastPos = pos + search.length();
     }
+  }
+
+  return output;
+}
+
+//-----------------------------------------------------------------------------
+String zax::stringReplace(
+  const StringView input,
+  const StringViewMap& mapping) noexcept
+{
+  if (mapping.size() < 1)
+    return String{ input };
+
+  String output{ input };
+
+  for (auto& [search, replace] : mapping) {
+    String::size_type lastPos{};
+    while (true) {
+      auto pos{ output.find(search, lastPos) };
+      if (pos == String::npos)
+        break;
+
+      output.replace(pos, search.length(), replace);
+      lastPos = pos + search.length();
+    }
+  }
+
+  return output;
+}
+
+//-----------------------------------------------------------------------------
+String zax::stringReplace(
+  const StringView input,
+  const StringView search,
+  const StringView replace) noexcept
+{
+  if (search.size() < 1)
+    return String{ input };
+
+  String output{ input };
+
+  String::size_type lastPos{};
+  while (true) {
+    auto pos{ output.find(search, lastPos) };
+    if (pos == String::npos)
+      break;
+
+    output.replace(pos, search.length(), replace);
+    lastPos = pos + search.length();
   }
 
   return output;

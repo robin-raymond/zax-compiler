@@ -17,6 +17,7 @@ void actualCheck(
 
 #define TEST(x) actualCheck(x, #x, __FILE__, __FUNCTION__, __LINE__)
 
+void testHelpers() noexcept(false);
 void testOperatorLut() noexcept(false);
 void testTokenizer() noexcept(false);
 void testTokenList() noexcept(false);

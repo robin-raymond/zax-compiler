@@ -94,6 +94,7 @@ void zaxTest::output(StringView testName) noexcept
 int runAllTests() noexcept
 {
   try {
+    testHelpers();
     testOperatorLut();
     testTokenizer();
     testTokenList();

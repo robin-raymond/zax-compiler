@@ -1623,6 +1623,8 @@ struct TokenListBasics
     auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
 
     runner([&]() { testBasic(); });
+
+    reset();
   }
 };
 

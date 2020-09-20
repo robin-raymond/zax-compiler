@@ -14,7 +14,6 @@ struct Config
   String listingFilePath_;
   int tabStopWidth_{ 8 };
 
-
   struct MetaData final
   {
     String outputPath_;

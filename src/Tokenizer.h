@@ -5,6 +5,7 @@
 #include "helpers.h"
 #include "Token.h"
 #include "TokenList.h"
+#include "Source.h"
 #include "Errors.h"
 
 namespace zax {
@@ -17,8 +18,8 @@ struct TokenizerTypes
   struct ParserPos
   {
     StringView pos_;
-    int line_{ 1 };
-    int column_{ 1 };
+    SourceTypes::Location location_;
+    SourceTypes::Location actualLocation_;
     int tabSize_{ 8 };
     int utf8Count_{};
 
@@ -84,7 +85,8 @@ public:
   Puid id_{ puid() };
   TokenList parsedTokens_;
 
-  SourceFilePathPtr filePath_;
+  SourceTypes::FilePathPtr filePath_;
+  SourceTypes::FilePathPtr actualFilePath_;
   std::pair< std::unique_ptr<std::byte[]>, size_t> rawContents_;
   CompileStatePtr compileState_;
   OperatorLutConstPtr operatorLut_;
@@ -96,7 +98,7 @@ public:
 public:
 
   Tokenizer(
-    const SourceFilePathPtr &filePath,
+    const SourceTypes::FilePathPtr &filePath,
     std::pair< std::unique_ptr<std::byte[]>, size_t>&& rawContents,
     const CompileStatePtr& compileState,
     const OperatorLutConstPtr& operatorLut
@@ -105,7 +107,7 @@ public:
 
   static void count(ParserPos& parserPos, char let) noexcept;
   static void advance(ParserPos& parserPos, StringView str) noexcept                { advance(parserPos, str.length()); }
-  static void advance(ParserPos& parserPos, size_t length) noexcept                 { parserPos.column_ += SafeInt<decltype(parserPos.column_)>(length); }
+  static void advance(ParserPos& parserPos, size_t length) noexcept                 { parserPos.location_.column_ += SafeInt<decltype(parserPos.location_.column_)>(length); }
   static bool consumeUtf8Bom(ParserPos& parserPos) noexcept;
   [[nodiscard]] static optional<CommentToken> consumeComment(ParserPos& parserPos) noexcept;
   [[nodiscard]] static optional<WhitespaceToken> consumeWhitespace(ParserPos& parserPos) noexcept;

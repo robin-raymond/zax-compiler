@@ -3,7 +3,7 @@
 
 #include "types.h"
 #include "helpers.h"
-#include "SourceLocation.h"
+#include "Source.h"
 
 namespace zax
 {
@@ -405,7 +405,9 @@ struct Token : public TokenTypes
   StringView originalToken_;
   StringView token_;
 
-  SourceLocation location_;
+  SourceTypes::Origin origin_;
+  SourceTypes::Origin actualOrigin_;
+
   CompileStatePtr compileState_;
 };
 

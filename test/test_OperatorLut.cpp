@@ -153,6 +153,8 @@ struct OperatorLutBasics
     auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
 
     runner([&]() { test(); });
+
+    reset();
   }
 };
 

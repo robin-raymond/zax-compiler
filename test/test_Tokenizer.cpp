@@ -4,7 +4,7 @@
 #include "common.h"
 
 #include "../src/Tokenizer.h"
-#include "../src/SourceFilePath.h"
+#include "../src/Source.h"
 #include "../src/CompileState.h"
 #include "../src/CompilerException.h"
 #include "../src/OperatorLut.h"
@@ -36,15 +36,8 @@ struct TokenizerBasics
   //-------------------------------------------------------------------------
   void expect(int line, int column) noexcept(false)
   {
-    TEST(pos_.line_ == line);
-    TEST(pos_.column_ == column);
-  }
-
-  //-------------------------------------------------------------------------
-  void expect(int line, int column, int overrideLine) noexcept(false)
-  {
-    TEST(pos_.line_ == line);
-    TEST(pos_.column_ == column);
+    TEST(pos_.location_.line_ == line);
+    TEST(pos_.location_.column_ == column);
   }
 
   //-------------------------------------------------------------------------
@@ -1227,6 +1220,8 @@ struct TokenizerBasics
     runner([&]() { testNumeric(); });
     runner([&]() { testOperator(); });
     runner([&]() { testKnownIllegalToken(); });
+
+    reset();
   }
 };
 
@@ -1238,7 +1233,7 @@ struct TokenizerInstance
 {
   std::optional<Tokenizer> tokenizer_;
 
-  zax::SourceFilePathPtr filePath_{ std::make_shared<zax::SourceFilePath>() };
+  zax::SourceTypes::FilePathPtr filePath_{ std::make_shared<zax::SourceTypes::FilePath>() };
   zax::CompileStatePtr compileState_{ std::make_shared<zax::CompileState>() };
   zax::OperatorLutPtr operatorLut_{ std::make_shared<zax::OperatorLut>() };
 
@@ -1296,7 +1291,7 @@ struct TokenizerInstance
   //-------------------------------------------------------------------------
   void validate(const zax::TokenConstPtr& token) noexcept(false)
   {
-    TEST(token->location_.filePath_ == filePath_);
+    TEST(token->origin_.filePath_ == filePath_);
     TEST(token->compileState_ == compileState_);
   }
 
@@ -1307,8 +1302,8 @@ struct TokenizerInstance
     int column) noexcept(false)
   {
     validate(token);
-    TEST(token->location_.line_ == line);
-    TEST(token->location_.column_ == column);
+    TEST(token->origin_.location_.line_ == line);
+    TEST(token->origin_.location_.column_ == column);
   }
 
   //-------------------------------------------------------------------------
@@ -1318,8 +1313,8 @@ struct TokenizerInstance
     
     auto& front{ failures_.front() };
     TEST(front.error_ == error);
-    TEST(front.line_ == token->location_.line_);
-    TEST(front.column_ == token->location_.column_);
+    TEST(front.line_ == token->origin_.location_.line_);
+    TEST(front.column_ == token->origin_.location_.column_);
     failures_.pop_front();
   }
 
@@ -2381,7 +2376,7 @@ struct TokenizerInstance
     runner([&]() { simple6(); });
     runner([&]() { simple7(); });
     runner([&]() { simple8(); });
-    //runner([&]() { simple9(); });
+    runner([&]() { simple9(); });
     runner([&]() { simple10(); });
 
     reset();

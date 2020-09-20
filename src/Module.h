@@ -11,7 +11,6 @@ namespace zax
 struct Module
 {
   Puid id_{ puid() };
-  CompileState compileState_;
 };
 
 } // namespace zax

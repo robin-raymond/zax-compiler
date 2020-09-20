@@ -11,8 +11,8 @@ using namespace std::string_view_literals;
 bool TokenizerTypes::ParserPos::operator==(const ParserPos& rhs) const noexcept
 {
   return
-    (line_ == rhs.line_) &&
-    (column_ == rhs.column_) &&
+    (location_ == rhs.location_) &&
+    (actualLocation_ == rhs.actualLocation_) &&
     (pos_ == rhs.pos_) &&
     (tabSize_ == rhs.tabSize_) &&
     (lineSkip_ == rhs.lineSkip_);
@@ -22,18 +22,19 @@ bool TokenizerTypes::ParserPos::operator==(const ParserPos& rhs) const noexcept
 bool TokenizerTypes::ParserPos::sameLocation(const ParserPos& rhs) const noexcept
 {
   return
-    (line_ == rhs.line_) &&
-    (column_ == rhs.column_);
+    (location_ == rhs.location_) &&
+    (actualLocation_ == rhs.actualLocation_);
 }
 
 //-----------------------------------------------------------------------------
 Tokenizer::Tokenizer(
-  const SourceFilePathPtr& filePath,
+  const SourceTypes::FilePathPtr& filePath,
   std::pair< std::unique_ptr<std::byte[]>, size_t>&& rawContents,
   const CompileStatePtr& compileState,
   const OperatorLutConstPtr& operatorLut
 ) noexcept :
   filePath_(filePath),
+  actualFilePath_(filePath),
   rawContents_(std::move(rawContents)),
   compileState_(compileState),
   operatorLut_(operatorLut)
@@ -71,13 +72,15 @@ void Tokenizer::count(ParserPos& parserPos, char c) noexcept
       parserPos.utf8Count_ = 2;
     else if ((rawByte & 0xF8) == 0xF0)
       parserPos.utf8Count_ = 3;
-    ++parserPos.column_;
+    ++parserPos.location_.column_;
+    parserPos.actualLocation_.column_ = parserPos.location_.column_;
     return;
   }
 
   parserPos.utf8Count_ = 0;
   if (!iscntrl(c)) {
-    ++parserPos.column_;
+    ++parserPos.location_.column_;
+    parserPos.actualLocation_.column_ = parserPos.location_.column_;
     return;
   }
 
@@ -85,25 +88,31 @@ void Tokenizer::count(ParserPos& parserPos, char c) noexcept
 
   switch (c) {
     case '\r':  {
-      parserPos.column_ = 1;
+      parserPos.location_.column_ = 1;
+      parserPos.actualLocation_.column_ = parserPos.location_.column_;
       return;
     }
     case '\f':
     case '\n':  {
-      parserPos.line_ += parserPos.lineSkip_;
-      parserPos.column_ = 1;
+      parserPos.location_.line_ += parserPos.lineSkip_;
+      parserPos.location_.column_ = 1;
+      parserPos.actualLocation_.column_ = parserPos.location_.column_;
+      ++parserPos.actualLocation_.line_;
       return;
     }
     case '\v':  {
-      parserPos.line_ += parserPos.lineSkip_;
+      parserPos.location_.line_ += parserPos.lineSkip_;
+      ++parserPos.actualLocation_.line_;
       break;
     }
     case '\t':  {
-      parserPos.column_ += parserPos.tabSize_ - ((parserPos.column_ - 1) % parserPos.tabSize_);
+      parserPos.location_.column_ += parserPos.tabSize_ - ((parserPos.location_.column_ - 1) % parserPos.tabSize_);
+      parserPos.actualLocation_.column_ = parserPos.location_.column_;
       return;
     }
     case '\b':  {
-      parserPos.column_ = std::max(1, parserPos.column_ - 1);
+      parserPos.location_.column_ = std::max(1, parserPos.location_.column_ - 1);
+      parserPos.actualLocation_.column_ = parserPos.location_.column_;
       return;
     }
     default:  return;
@@ -173,7 +182,7 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
 
   // handle `/**` `**/` nested comments
   if (parserPos.pos_.substr(0, slashStarStar.length()) == slashStarStar) {
-    auto startLine = parserPos.line_;
+    auto startLine = parserPos.location_.line_;
     const char* start = parserPos.pos_.data();
     const char* startAfter = start + slashStarStar.length();
     auto pos = startAfter;
@@ -213,13 +222,13 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
       .originalToken_ = makeStringView(start, pos),
       .token_ = makeStringView(startAfter, preFinal),
       .foundEnding_ = (0 == nestCount),
-      .addNewLine_ = (startLine != parserPos.line_)
+      .addNewLine_ = (startLine != parserPos.location_.line_)
     };
   }
 
   // handle `/*` `*/` comments
   if (parserPos.pos_.substr(0, slashSlash.length()) == slashStar) {
-    auto startLine = parserPos.line_;
+    auto startLine = parserPos.location_.line_;
     const char* start = parserPos.pos_.data();
     const char* startAfter = start + slashStar.length();
     auto pos = startAfter;
@@ -247,7 +256,7 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
       .originalToken_ = makeStringView(start, pos),
       .token_ = makeStringView(startAfter, preFinal),
       .foundEnding_ = foundEnding,
-      .addNewLine_ = (startLine != parserPos.line_)
+      .addNewLine_ = (startLine != parserPos.location_.line_)
     };
   }
 
@@ -496,7 +505,8 @@ optional<TokenizerTypes::OperatorToken> Tokenizer::consumeOperator(const Operato
 
   auto operAsStr = lut.lookup(*oper);
 
-  parserPos.column_ += operAsStr.length();
+  parserPos.location_.column_ += operAsStr.length();
+  parserPos.actualLocation_.column_ = parserPos.location_.column_;
 
   TokenizerTypes::OperatorToken result;
   result.operator_ = *oper;
@@ -557,9 +567,10 @@ void Tokenizer::primeNext() noexcept
 
   auto makeToken{ [&]() noexcept -> TokenPtr {
     auto token{ std::make_shared<Token>() };
-    token->location_.filePath_ = filePath_;
-    token->location_.line_ = oldPos.line_;
-    token->location_.column_ = oldPos.column_;
+    token->origin_.filePath_ = filePath_;
+    token->origin_.location_ = oldPos.location_;
+    token->actualOrigin_.filePath_ = actualFilePath_;
+    token->actualOrigin_.location_ = oldPos.actualLocation_;
     token->compileState_ = compileState_;
     return token;
   } };
