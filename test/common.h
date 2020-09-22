@@ -21,6 +21,7 @@ void testHelpers() noexcept(false);
 void testOperatorLut() noexcept(false);
 void testTokenizer() noexcept(false);
 void testTokenList() noexcept(false);
+void testCompiler() noexcept(false);
 
 void output(StringView testName) noexcept;
 

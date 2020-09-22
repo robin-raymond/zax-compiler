@@ -36,6 +36,7 @@ Tokenizer::Tokenizer(
   filePath_(filePath),
   actualFilePath_(filePath),
   rawContents_(std::move(rawContents)),
+  raw_(rawContents_.first.get()),
   compileState_(compileState),
   operatorLut_(operatorLut)
 {
@@ -45,11 +46,39 @@ Tokenizer::Tokenizer(
   assert(operatorLut_);
 
   static_assert(sizeof(std::byte) == sizeof(char));
-  parserPos_.pos_ = StringView{ reinterpret_cast<const char *>(rawContents_.first.get()), rawContents_.second };
+  parserPos_.pos_ = StringView{ reinterpret_cast<const char *>(raw_), rawContents_.second };
 
-  errorCallback_ = [](ErrorTypes::Error error, TokenPtr token) noexcept {
-    output(error, token);
+  errorCallback_ = [](ErrorTypes::Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept {
+    output(error, token, mapping);
   };
+  warningCallback_ = [](WarningTypes::Warning warning, const TokenConstPtr& token, const StringMap& mapping) noexcept {
+    output(warning, token, mapping);
+  };
+}
+
+//-----------------------------------------------------------------------------
+Tokenizer::Tokenizer(
+  const Tokenizer& original,
+  TokenList&& tokenList) noexcept :
+  parsedTokens_(std::move(tokenList)),
+  filePath_(original.filePath_),
+  actualFilePath_(original.actualFilePath_),
+  compileState_(original.compileState_),
+  operatorLut_(original.operatorLut_),
+  errorCallback_(original.errorCallback_),
+  warningCallback_(original.warningCallback_),
+  skipComments_(original.skipComments_)
+{
+  constexpr static const char* const nulStr{ "" };
+  raw_ = reinterpret_cast<const std::byte*>(nulStr);
+
+  assert(filePath_);
+  assert(rawContents_.first);
+  assert(compileState_);
+  assert(operatorLut_);
+
+  static_assert(sizeof(std::byte) == sizeof(char));
+  parserPos_.pos_ = StringView{ reinterpret_cast<const char*>(raw_), rawContents_.second };
 }
 
 //-----------------------------------------------------------------------------
@@ -575,13 +604,18 @@ void Tokenizer::primeNext() noexcept
     return token;
   } };
 
-  auto whitespace{ [&]() noexcept -> bool {
-    while (true) {
-      auto value{ consumeWhitespace(parserPos_) };
-      if (!value)
-        break;
+  auto whitespace{ [&](
+    bool skipWhitespace,
+    bool& outDidConsumeWhitespace,
+    bool& outContainedNewline) noexcept -> bool {
+    auto value{ consumeWhitespace(parserPos_) };
+    if (!value)
+      return false;
 
-      if (value->addNewLine_) {
+    outDidConsumeWhitespace = true;
+    if (value->addNewLine_) {
+      outContainedNewline = true;
+      if (!skipWhitespace) {
         auto tokenNewLine{ makeToken() };
         tokenNewLine->type_ = TokenTypes::Type::Separator;
         tokenNewLine->originalToken_ = value->originalToken_;
@@ -593,29 +627,38 @@ void Tokenizer::primeNext() noexcept
     return false;
   } };
 
-  auto comment{ [&]() noexcept -> bool {
+  auto comment{ [&](
+    bool skipComments,
+    bool& outDidConsumeComment,
+    bool& outContainedNewline) noexcept -> bool {
     auto value{ consumeComment(parserPos_) };
     if (!value)
       return false;
+
+    outDidConsumeComment = true;
 
     auto token{ makeToken() };
     token->type_ = TokenTypes::Type::Comment;
     token->originalToken_ = value->originalToken_;
     token->token_ = value->token_;
-    parsedTokens_.pushBack(token);
+    if (!skipComments)
+      parsedTokens_.pushBack(token);
 
     if (value->addNewLine_) {
-      auto tokenNewLine{ makeToken() };
-      tokenNewLine->type_ = TokenTypes::Type::Separator;
-      tokenNewLine->originalToken_ = value->originalToken_;
-      tokenNewLine->token_ = value->token_;
-      parsedTokens_.pushBack(tokenNewLine);
+      outContainedNewline = true;
+      if (!skipComments) {
+        auto tokenNewLine{ makeToken() };
+        tokenNewLine->type_ = TokenTypes::Type::Separator;
+        tokenNewLine->originalToken_ = value->originalToken_;
+        tokenNewLine->token_ = value->token_;
+        parsedTokens_.pushBack(tokenNewLine);
+      }
     }
 
     if (!value->foundEnding_)
-      errorCallback_(ErrorTypes::Error::MissingEndOfComment, token);
+      out(ErrorTypes::Error::MissingEndOfComment, token);
 
-    return true;
+    return !skipComments;
   } };
 
   auto quote{ [&]() noexcept -> bool {
@@ -630,7 +673,7 @@ void Tokenizer::primeNext() noexcept
     parsedTokens_.pushBack(token);
 
     if (!value->foundEnding_)
-      errorCallback_(ErrorTypes::Error::MissingEndOfQuote, token);
+      out(ErrorTypes::Error::MissingEndOfQuote, token);
 
     return true;
   } };
@@ -658,22 +701,32 @@ void Tokenizer::primeNext() noexcept
     token->originalToken_ = value->token_;
     token->token_ = value->token_;
     if (value->illegalSequence_)
-      errorCallback_(ErrorTypes::Error::ConstantSyntax, token);
+      out(ErrorTypes::Error::ConstantSyntax, token);
 
     parsedTokens_.pushBack(token);
     return true;
   } };
 
-  auto oper{ [&]() noexcept -> bool {
+  auto oper{ [&](bool& outIsContinuation) noexcept -> bool {
     auto value{ consumeOperator(*operatorLut_, parserPos_) };
     if (!value)
       return false;
+
+    if (value->operator_ == TokenTypes::Operator::Continuation) {
+      outIsContinuation = true;
+      return false;
+    }
 
     auto token{ makeToken() };
     token->type_ = TokenTypes::Type::Operator;
     token->originalToken_ = value->token_;
     token->token_ = value->token_;
     token->operator_ = value->operator_;
+
+    if (value->operator_ == TokenTypes::Operator::StatementSeparator) {
+      token->type_ = TokenTypes::Type::Separator;
+      token->forcedSeparator_ = true;
+    }
 
     parsedTokens_.pushBack(token);
     return true;
@@ -685,30 +738,73 @@ void Tokenizer::primeNext() noexcept
       return true;
 
     auto token{ makeToken() };
-    token->type_ = TokenTypes::Type::Number;
+    token->type_ = TokenTypes::Type::Literal;
     token->originalToken_ = value->token_;
     token->token_ = value->token_;
 
-    errorCallback_(ErrorTypes::Error::Syntax, token);
+    out(ErrorTypes::Error::Syntax, token);
     return false;
   } };
 
   while (true) {
-    if (whitespace())
+    bool didConsume{};
+    bool containedNewline{};
+    if (whitespace(false, didConsume, containedNewline))
       return;
-    if (comment())
+    if (didConsume) {
+      oldPos = parserPos_;
+      continue;
+    }
+    if (comment(skipComments_, didConsume, containedNewline))
       return;
+    if (didConsume) {
+      oldPos = parserPos_;
+      continue;
+    }
     if (quote())
       return;
     if (literal())
       return;
     if (numeric())
       return;
-    if (oper())
+
+    bool isContinuation{};
+    if (oper(isContinuation))
       return;
+
+    if (isContinuation) {
+      while (true) {
+        oldPos = parserPos_;
+        didConsume = false;
+        containedNewline = false;
+        (void)comment(true, didConsume, containedNewline);
+        if (containedNewline)
+          break;
+
+        oldPos = parserPos_;
+        (void)whitespace(true, didConsume, containedNewline);
+        if (containedNewline)
+          break;
+        if (!didConsume)
+          break;
+      }
+      oldPos = parserPos_;
+
+      if (!containedNewline) {
+        auto token{ makeToken() };
+        token->type_ = TokenTypes::Type::Literal;
+        token->originalToken_ = parserPos_.pos_.size() > 0 ? parserPos_.pos_.substr(0, 1) : StringView{};
+        token->token_ = token->originalToken_;
+
+        out(WarningTypes::Warning::NewlineAfterContinuation, token);
+      }
+      oldPos = parserPos_;
+      continue;
+    }
 
     if (illegal())
       return;
+
     oldPos = parserPos_;
   }
 }
@@ -856,6 +952,34 @@ TokenPtr Tokenizer::popBack() noexcept
 }
 
 //-----------------------------------------------------------------------------
+TokenPtr Tokenizer::front() noexcept
+{
+  prime();
+  return parsedTokens_.front();
+}
+
+//-----------------------------------------------------------------------------
+TokenPtr Tokenizer::back() noexcept
+{
+  prime();
+  return parsedTokens_.back();
+}
+
+//-----------------------------------------------------------------------------
+TokenConstPtr Tokenizer::front() const noexcept
+{
+  prime();
+  return parsedTokens_.front();
+}
+
+//-----------------------------------------------------------------------------
+TokenConstPtr Tokenizer::back() const noexcept
+{
+  prime();
+  return parsedTokens_.back();
+}
+
+//-----------------------------------------------------------------------------
 void Tokenizer::extractThenPushFront(TokenList& rhs) noexcept
 {
   parsedTokens_.extractThenPushFront(rhs);
@@ -899,7 +1023,7 @@ TokenPtr Tokenizer::operator[](index_type count) noexcept
 }
 
 //-----------------------------------------------------------------------------
-const TokenPtr Tokenizer::operator[](index_type count) const noexcept
+const TokenConstPtr Tokenizer::operator[](index_type count) const noexcept
 {
   ensurePosExists(count);
   return parsedTokens_[count];
@@ -927,6 +1051,26 @@ bool Tokenizer::empty() const noexcept
 }
 
 //-----------------------------------------------------------------------------
+void Tokenizer::clear() noexcept
+{
+  parsedTokens_.clear();
+
+  if (parserPos_.pos_.size() < 1)
+    return;
+
+  const char* start{ parserPos_.pos_.data() };
+  auto end = start + parserPos_.pos_.length();
+  auto pos{ start };
+
+  while (pos < end) {
+    count(parserPos_, *pos);
+    ++pos;
+  }
+
+  parserPos_.pos_ = makeStringView(pos, end);
+}
+
+//-----------------------------------------------------------------------------
 Tokenizer::size_type Tokenizer::size() const noexcept
 {
   size_type totalSize{ parsedTokens_.size() };
@@ -946,6 +1090,12 @@ TokenList Tokenizer::extract(iterator first, index_type count) noexcept
 {
   assert(&(first.list()) == this);
   return zax::extract(first, first + count);
+}
+
+//-----------------------------------------------------------------------------
+TokenList Tokenizer::extract(index_type first, index_type count) noexcept
+{
+  return zax::extract(begin() + first, count);
 }
 
 //-----------------------------------------------------------------------------
@@ -1045,6 +1195,19 @@ void Tokenizer::ensurePosExists(index_type pos) const noexcept
     --pos;
   }
 }
+
+//-----------------------------------------------------------------------------
+void Tokenizer::out(ErrorTypes::Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept
+{
+  errorCallback_(error, token, mapping);
+}
+
+//-----------------------------------------------------------------------------
+void Tokenizer::out(WarningTypes::Warning warning, const TokenConstPtr& token, const StringMap& mapping) noexcept
+{
+  warningCallback_(warning, token, mapping);
+}
+
 
 //-----------------------------------------------------------------------------
 TokenList zax::extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept

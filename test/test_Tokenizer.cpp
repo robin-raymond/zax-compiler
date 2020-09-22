@@ -1239,11 +1239,16 @@ struct TokenizerInstance
 
   struct ExpectedFailures
   {
-    zax::ErrorTypes::Error error_{};
+    std::variant<zax::ErrorTypes::Error, zax::WarningTypes::Warning> type_{};
     int line_{};
     int column_{};
     ExpectedFailures(zax::ErrorTypes::Error error, int line, int column) noexcept(false) :
-      error_(error),
+      type_(error),
+      line_(line),
+      column_(column)
+    {}
+    ExpectedFailures(zax::WarningTypes::Warning warning, int line, int column) noexcept(false) :
+      type_(warning),
       line_(line),
       column_(column)
     {}
@@ -1269,8 +1274,11 @@ struct TokenizerInstance
     memcpy(content.first.get(), value.data(), sizeof(char) * value.size());
     tokenizer_.emplace(filePath_, std::move(content), compileState_, operatorLut_);
 
-    tokenizer_->errorCallback_ = [&](zax::ErrorTypes::Error error, zax::TokenPtr token) noexcept(false) {
+    tokenizer_->errorCallback_ = [&](zax::ErrorTypes::Error error, const zax::TokenConstPtr token, const zax::StringMap&) noexcept(false) {
       handleException(error, token);
+    };
+    tokenizer_->warningCallback_ = [&](zax::WarningTypes::Warning warning, const zax::TokenConstPtr token, const zax::StringMap&) noexcept(false) {
+      handleException(warning, token);
     };
   }
 
@@ -1307,21 +1315,47 @@ struct TokenizerInstance
   }
 
   //-------------------------------------------------------------------------
-  void handleException(zax::ErrorTypes::Error error, zax::TokenPtr token) noexcept(false)
+  void handleException(zax::ErrorTypes::Error error, const zax::TokenConstPtr& token) noexcept(false)
   {
     TEST(failures_.size() > 0);
     
     auto& front{ failures_.front() };
-    TEST(front.error_ == error);
+    
+    auto ptr{ std::get_if<zax::ErrorTypes::Error>(&front.type_) };
+    TEST(ptr);
+
+    TEST(*ptr == error);
     TEST(front.line_ == token->origin_.location_.line_);
     TEST(front.column_ == token->origin_.location_.column_);
     failures_.pop_front();
   }
 
   //-------------------------------------------------------------------------
-  void expectError(zax::ErrorTypes::Error error, int line, int column) noexcept(false)
+  void handleException(zax::WarningTypes::Warning warning, const zax::TokenConstPtr& token) noexcept(false)
+  {
+    TEST(failures_.size() > 0);
+
+    auto& front{ failures_.front() };
+
+    auto ptr{ std::get_if<zax::WarningTypes::Warning>(&front.type_) };
+    TEST(ptr);
+
+    TEST(*ptr == warning);
+    TEST(front.line_ == token->origin_.location_.line_);
+    TEST(front.column_ == token->origin_.location_.column_);
+    failures_.pop_front();
+  }
+
+  //-------------------------------------------------------------------------
+  void expect(zax::ErrorTypes::Error error, int line, int column) noexcept(false)
   {
     failures_.emplace_back(error, line, column);
+  }
+
+  //-------------------------------------------------------------------------
+  void expect(zax::WarningTypes::Warning warning, int line, int column) noexcept(false)
+  {
+    failures_.emplace_back(warning, line, column);
   }
 
   //-------------------------------------------------------------------------
@@ -1341,7 +1375,7 @@ struct TokenizerInstance
     }
     {
       prepare("/* comment");
-      expectError(zax::ErrorTypes::Error::MissingEndOfComment, 1, 1);
+      expect(zax::ErrorTypes::Error::MissingEndOfComment, 1, 1);
 
       auto iter{ std::begin(get()) };
 
@@ -1355,7 +1389,7 @@ struct TokenizerInstance
     }
     {
       prepare("/** comment");
-      expectError(zax::ErrorTypes::Error::MissingEndOfComment, 1, 1);
+      expect(zax::ErrorTypes::Error::MissingEndOfComment, 1, 1);
 
       auto iter{ std::begin(get()) };
 
@@ -1461,7 +1495,7 @@ struct TokenizerInstance
     {
       ++iter;
       auto token{ *iter };
-      validate(token, 1, 4);
+      validate(token, 1, 5);
       TEST(token->type_ == zax::Token::Type::Number);
       TEST(token->originalToken_ == "134.4e+5");
       TEST(token->token_ == "134.4e+5");
@@ -1513,7 +1547,7 @@ struct TokenizerInstance
       "abc 134.4e.5+=foo\n"
       "+++'\"hello\"'"
     );
-    expectError(zax::ErrorTypes::Error::ConstantSyntax, 1, 4);
+    expect(zax::ErrorTypes::Error::ConstantSyntax, 1, 5);
     auto iter{ std::begin(get()) };
 
     {
@@ -1526,7 +1560,7 @@ struct TokenizerInstance
     {
       ++iter;
       auto token{ *iter };
-      validate(token, 1, 4);
+      validate(token, 1, 5);
       TEST(token->type_ == zax::Token::Type::Number);
       TEST(token->originalToken_ == "134.4e");
       TEST(token->token_ == "134.4e");
@@ -1595,9 +1629,9 @@ struct TokenizerInstance
       "+++\"\'hello\n"
       "---``#%"
     );
-    expectError(zax::ErrorTypes::Error::MissingEndOfQuote, 2, 4);
-    expectError(zax::ErrorTypes::Error::Syntax, 3, 4);
-    expectError(zax::ErrorTypes::Error::Syntax, 3, 6);
+    expect(zax::ErrorTypes::Error::MissingEndOfQuote, 2, 4);
+    expect(zax::ErrorTypes::Error::Syntax, 3, 4);
+    expect(zax::ErrorTypes::Error::Syntax, 3, 6);
     auto iter{ std::begin(get()) };
     auto iterBogus{ std::begin(get()) };
     TEST(iter == iterBogus);
@@ -1612,7 +1646,7 @@ struct TokenizerInstance
     {
       ++iter;
       auto token{ *iter };
-      validate(token, 1, 4);
+      validate(token, 1, 5);
       TEST(token->type_ == zax::Token::Type::Number);
       TEST(token->originalToken_ == "134");
       TEST(token->token_ == "134");
@@ -2360,7 +2394,139 @@ struct TokenizerInstance
       vec1.insert(vec1.end(), vec3.begin(), vec3.end());
       checkList(list, std::move(vec1));
     }
+  }
 
+  //-------------------------------------------------------------------------
+  void continuation() noexcept(false)
+  {
+    {
+      prepare("\\");
+      expect(zax::WarningTypes::Warning::NewlineAfterContinuation, 1, 2);
+
+      auto iter{ std::begin(get()) };
+
+      auto token{ *iter };
+      TEST(!token);
+      TEST(iter == std::end(get()));
+    }
+    {
+      prepare(
+        "\\\n"
+        "hello"
+      );
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        validate(token, 2, 1);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "hello");
+        TEST(token->token_ == "hello");
+        ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
+
+    {
+      prepare(
+        "\\ // ignore me\n"
+        "hello"
+      );
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        validate(token, 2, 1);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "hello");
+        TEST(token->token_ == "hello");
+        ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
+    {
+      prepare(
+        "\\ /* ignore me\n"
+        "*/hello"
+      );
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        validate(token, 2, 3);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "hello");
+        TEST(token->token_ == "hello");
+        ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
+    {
+      prepare(
+        "\\ problem\n"
+        "hello"
+      );
+
+      expect(zax::WarningTypes::Warning::NewlineAfterContinuation, 1, 3);
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        validate(token, 1, 3);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "problem");
+        TEST(token->token_ == "problem");
+        ++iter;
+        TEST(iter != std::end(get()));
+      }
+
+      {
+        auto token{ *iter };
+        validate(token, 1, 20-11+1);
+        TEST(token->type_ == zax::Token::Type::Separator);
+        ++iter;
+        TEST(iter != std::end(get()));
+      }
+
+      {
+        auto token{ *iter };
+        validate(token, 2, 1);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "hello");
+        TEST(token->token_ == "hello");
+        ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
+
+    {
+      prepare(
+        "\\\n"
+        "\\\n"
+        "\\\n"
+        "\\\n"
+        "\\\n"
+        "\\\n"
+        "\\\n"
+        "hello"
+      );
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        validate(token, 8, 1);
+        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->originalToken_ == "hello");
+        TEST(token->token_ == "hello");
+        ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
   }
 
   //-------------------------------------------------------------------------
@@ -2378,6 +2544,7 @@ struct TokenizerInstance
     runner([&]() { simple8(); });
     runner([&]() { simple9(); });
     runner([&]() { simple10(); });
+    runner([&]() { continuation(); });
 
     reset();
   }

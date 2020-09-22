@@ -10,9 +10,8 @@
 #include "OperatorLut.h"
 #include "Panics.h"
 #include "Source.h"
-#include "SourceFilePath.h"
-#include "SourceLocation.h"
 #include "Token.h"
 #include "Tokenizer.h"
 #include "TokenList.h"
 #include "Warnings.h"
+ 

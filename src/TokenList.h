@@ -61,6 +61,12 @@ struct TokenList final : public TokenListTypes
   TokenPtr popFront() noexcept;
   TokenPtr popBack() noexcept;
 
+  TokenPtr front() noexcept;
+  TokenPtr back() noexcept;
+
+  TokenConstPtr front() const noexcept;
+  TokenConstPtr back() const noexcept;
+
   void extractThenPushFront(TokenList& rhs) noexcept;
   void extractThenPushBack(TokenList& rhs) noexcept;
 
@@ -78,13 +84,15 @@ struct TokenList final : public TokenListTypes
   [[nodiscard]] const_iterator cend() const noexcept;
 
   [[nodiscard]] TokenPtr operator[](index_type count) noexcept;
-  [[nodiscard]] const TokenPtr operator[](index_type count) const noexcept;
+  [[nodiscard]] const TokenConstPtr operator[](index_type count) const noexcept;
 
   [[nodiscard]] iterator at(index_type count) noexcept;
   [[nodiscard]] const_iterator at(index_type count) const noexcept;
 
   [[nodiscard]] bool empty() const noexcept { return tokens_.empty(); };
   [[nodiscard]] auto size() const noexcept { return tokens_.size(); }
+
+  [[nodiscard]] void clear() noexcept { return tokens_.clear(); };
 
   [[nodiscard]] bool hasAhead(iterator pos, index_type count) const noexcept { assert(&(pos.list()) == &tokens_); return pos.hasAhead(count); }
   [[nodiscard]] bool hasBehind(iterator pos, index_type count) const noexcept { assert(&(pos.list()) == &tokens_); return pos.hasBehind(count); }
@@ -94,6 +102,7 @@ struct TokenList final : public TokenListTypes
 
   [[nodiscard]] TokenList extract(iterator first, iterator last) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, last); }
   [[nodiscard]] TokenList extract(iterator first, index_type count) noexcept { assert(&(first.list()) == &tokens_); return zax::extract(first, first + count); }
+  [[nodiscard]] TokenList extract(index_type first, index_type count) noexcept { return extract(at(first), count); }
 
   [[nodiscard]] TokenList extractFromStartToPos(iterator pos) noexcept { assert(&(pos.list()) == &tokens_); return zax::extractFromStartToPos(pos); }
   [[nodiscard]] TokenList extractFromPosToEnd(iterator pos) noexcept { assert(&(pos.list()) == &tokens_); return zax::extractFromPosToEnd(pos); }

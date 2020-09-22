@@ -54,6 +54,12 @@
     <ClCompile Include="..\..\..\test\test_helpers.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Compiler_Directives.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\test\test_Compiler.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\pch.h">

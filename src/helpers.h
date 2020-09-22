@@ -17,7 +17,7 @@ bool writeBinaryFile(
   size_t length) noexcept;
 
 inline bool writeBinaryFile(
-  const String fileName,
+  const StringView fileName,
   const StringView contents) noexcept
 {
   // short cut to prevent memory duplication as likely to be true
@@ -52,8 +52,31 @@ String locateFile(
   String& outFullFilePath,
   bool useAbsolutePath = false) noexcept;
 
+struct LocateWildCardFilesResult
+{
+  String path_;
+  String fullPath_;
+  StringList foundMatches_;
+
+  LocateWildCardFilesResult(
+    const StringView path,
+    const StringView fullPath,
+    const StringList& foundMatches) noexcept :
+    path_(path),
+    fullPath_(fullPath),
+    foundMatches_(foundMatches)
+  {}
+
+  LocateWildCardFilesResult() noexcept = default;
+  LocateWildCardFilesResult(const LocateWildCardFilesResult&) noexcept = default;
+  LocateWildCardFilesResult(LocateWildCardFilesResult&&) noexcept = default;
+
+  LocateWildCardFilesResult& operator=(const LocateWildCardFilesResult&) noexcept = default;
+  LocateWildCardFilesResult& operator=(LocateWildCardFilesResult&&) noexcept = default;
+};
+
 void locateWildCardFiles(
-  std::list<std::pair<String, String>>& outFoundFilePaths,
+  std::list<LocateWildCardFilesResult>& outFoundFilePaths,
   const StringView currentFile,
   const StringView newFileWithWildCards,
   bool useAbsolutePath = false) noexcept;

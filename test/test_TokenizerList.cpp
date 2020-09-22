@@ -78,6 +78,8 @@ struct TokenListBasics
         tokens.erase(tokens.begin());
         tokens.erase(tokens.end());
       }
+      TEST(!tokens.front());
+      TEST(!tokens.back());
       TEST(!tokens.popFront());
       TEST(!tokens.popBack());
 
@@ -127,6 +129,10 @@ struct TokenListBasics
       TEST(list.hasBehind(std::end(list), vector.size()));
       TEST(!list.hasBehind(std::end(list), vector.size()) + 1);
       TEST(list.size() == vector.size());
+
+      TEST(list.front()->token_ == vector[0]);
+      TEST(list.back()->token_ == vector[vector.size() - 1]);
+
       size_t count = 0;
       for (auto value : list) {
         TEST(value->token_ == vector[count]);
@@ -1314,7 +1320,7 @@ struct TokenListBasics
         list_ = alphabetList_;
         checkList(list_, makeVector(0, 26));
         auto tmp{ list_[26] };  // getting end() is safe
-        TEST(tmp->token_ == "Z");
+        TEST(!tmp);
         checkList(list_, makeVector(0, 26));
       }
 
@@ -1424,7 +1430,7 @@ struct TokenListBasics
         checkList(list_, makeVector(0, 26));
         const auto& clist{ list_ };
         auto tmp{ clist[26] };  // getting end() is safe
-        TEST(tmp->token_ == "Z");
+        TEST(!tmp);
         checkList(list_, makeVector(0, 26));
       }
 

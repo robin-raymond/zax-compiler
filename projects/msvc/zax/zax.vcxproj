@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Compiler.cpp" />
     <ClCompile Include="..\..\..\src\CompilerState.cpp" />
+    <ClCompile Include="..\..\..\src\Compiler_Directives.cpp" />
     <ClCompile Include="..\..\..\src\helpers.cpp" />
     <ClCompile Include="..\..\..\src\OperatorLut.cpp" />
     <ClCompile Include="..\..\..\src\pch.cpp">
@@ -35,6 +36,7 @@
     <ClCompile Include="..\..\..\src\CompilerException.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
+    <ClCompile Include="..\..\..\test\test_Compiler.cpp" />
     <ClCompile Include="..\..\..\test\test_helpers.cpp" />
     <ClCompile Include="..\..\..\test\test_OperatorLut.cpp" />
     <ClCompile Include="..\..\..\test\test_Tokenizer.cpp" />

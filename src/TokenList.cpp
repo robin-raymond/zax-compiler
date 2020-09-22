@@ -153,6 +153,38 @@ TokenPtr TokenList::popBack() noexcept
 }
 
 //-----------------------------------------------------------------------------
+TokenPtr TokenList::front() noexcept
+{
+  if (tokens_.empty())
+    return {};
+  return tokens_.front();
+}
+
+//-----------------------------------------------------------------------------
+TokenPtr TokenList::back() noexcept
+{
+  if (tokens_.empty())
+    return {};
+  return tokens_.back();
+}
+
+//-----------------------------------------------------------------------------
+TokenConstPtr TokenList::front() const noexcept
+{
+  if (tokens_.empty())
+    return {};
+  return tokens_.front();
+}
+
+//-----------------------------------------------------------------------------
+TokenConstPtr TokenList::back() const noexcept
+{
+  if (tokens_.empty())
+    return {};
+  return tokens_.back();
+}
+
+//-----------------------------------------------------------------------------
 void TokenList::extractThenPushFront(TokenList& rhs) noexcept
 {
   tokens_.splice(tokens_.begin(), rhs.tokens_, rhs.tokens_.begin(), rhs.tokens_.end());
@@ -231,15 +263,22 @@ TokenPtr TokenList::operator[](index_type count) noexcept
 {
   if (tokens_.empty())
     return {};
-  return zs::makeRandom(tokens_)[count];
+  auto iter{ zs::makeRandom(tokens_) + count };
+  if (iter.isEnd())
+    return {};
+  return *iter;
 }
 
 //-----------------------------------------------------------------------------
-const TokenPtr TokenList::operator[](index_type count) const noexcept
+const TokenConstPtr TokenList::operator[](index_type count) const noexcept
 {
   if (tokens_.empty())
     return {};
-  return zs::makeRandom(tokens_)[count];
+
+  auto iter{ zs::makeRandom(tokens_) + count };
+  if (iter.isEnd())
+    return {};
+  return *iter;
 }
 
 //-----------------------------------------------------------------------------

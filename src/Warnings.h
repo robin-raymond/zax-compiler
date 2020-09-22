@@ -50,10 +50,11 @@ struct WarningTypes
     RedundantAccessViaOwn,
     BadStyle,
     DescopeDirectiveRequired,
-    LeaseOrLast
+    LeaseOrLast,
+    NewlineAfterContinuation
   };
 
-  struct WarningDeclare final : public zs::EnumDeclare<Warning, 40>
+  struct WarningDeclare final : public zs::EnumDeclare<Warning, 41>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -97,12 +98,13 @@ struct WarningTypes
         {Warning::RedundantAccessViaOwn, "redundant-access-via-own"},
         {Warning::BadStyle, "bad-style"},
         {Warning::DescopeDirectiveRequired, "descope-directive-required"},
-        {Warning::LeaseOrLast, "lease-or-last"}
+        {Warning::LeaseOrLast, "lease-or-last"},
+        {Warning::NewlineAfterContinuation, "newline-after-continuation" }
       } };
     }
   };
 
-  struct WarningHumanReadableDeclare final : public zs::EnumDeclare<Warning, 40>
+  struct WarningHumanReadableDeclare final : public zs::EnumDeclare<Warning, 41>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -119,7 +121,7 @@ struct WarningTypes
         {Warning::DanglingReferenceOrPointer, "dangling-reference-or-pointer"},
         {Warning::DeprecateDirective, "deprecate-directive"},
         {Warning::DirectiveNotUnderstood, "directive-not-understood"},
-        {Warning::SourceNotFound, "source-not-found"},
+        {Warning::SourceNotFound, "a source file ($file$) was requested to be parsed but it cannot be located"},
         {Warning::AssetNotFound, "asset-not-found"},
         {Warning::Shadowing, "shadowing"},
         {Warning::UninitializedData, "uninitialized-data"},
@@ -146,7 +148,8 @@ struct WarningTypes
         {Warning::RedundantAccessViaOwn, "redundant-access-via-own"},
         {Warning::BadStyle, "bad-style"},
         {Warning::DescopeDirectiveRequired, "descope-directive-required"},
-        {Warning::LeaseOrLast, "lease-or-last"}
+        {Warning::LeaseOrLast, "lease-or-last"},
+        {Warning::NewlineAfterContinuation, "expecting new line after continuation operator" }
       } };
     }
   };

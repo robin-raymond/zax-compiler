@@ -16,6 +16,8 @@ namespace zax {
 using StringStream = std::stringstream;
 using String = std::string;
 using StringView = std::string_view;
+using StringList = std::list<String>;
+using StringViewList = std::list<StringView>;
 using StringMap = std::map<String, String>;
 using StringViewMap = std::map<StringView, StringView>;
 

@@ -126,7 +126,7 @@ struct ErrorTypes
         {Error::DeprecateDirective, "deprecate-directive"},
         {Error::ImportedModuleNotFound, "imported-module-not-found"},
         {Error::ImportedModuleFailure, "imported-module-failure"},
-        {Error::SourceNotFound, "source-not-found"},
+        {Error::SourceNotFound, "a source file ($file$) was requested to be parsed but it cannot be located"},
         {Error::AssetNotFound, "asset-not-found"},
         {Error::WildCharacterMismatch, "wild-character-mismatch"},
         {Error::FinalFunctionPointsToNothing, "final-function-points-to-nothing"},

@@ -99,25 +99,31 @@ struct CompilerException final : public std::exception
 
 int totalErrors() noexcept;
 int totalWarnings() noexcept;
+bool shouldAbort() noexcept;
+
+TokenPtr makeInternalToken(CompileStatePtr state) noexcept;
 
 void output(const CompilerException& exception) noexcept;
 inline void throwException(const CompilerException& exception) noexcept(false) { throw exception; }
 
 void output(
   InformationalTypes::Informational informational,
-  TokenPtr token,
+  const TokenConstPtr &token,
   const StringMap& params = {}) noexcept;
 void output(
   WarningTypes::Warning warning,
-  TokenPtr token,
+  const TokenConstPtr& token,
   const StringMap& params = {}) noexcept;
 void output(ErrorTypes::Error error,
-  TokenPtr token,
+  const TokenConstPtr& token,
+  const StringMap& params = {}) noexcept;
+void fatal(ErrorTypes::Error error,
+  const TokenConstPtr& token,
   const StringMap& params = {}) noexcept;
 
 void throwException(
   ErrorTypes::Error error,
-  TokenPtr token,
+  const TokenConstPtr& token,
   const StringMap& params = {}) noexcept(false);
 
 } // namespace zax

@@ -3,12 +3,30 @@
 #include "CompilerException.h"
 #include "Token.h"
 #include "CompileState.h"
+#include "Source.h"
 #include "helpers.h"
 
 using namespace zax;
 
 //-----------------------------------------------------------------------------
-void zax::output(InformationalTypes::Informational informational, TokenPtr token, const StringMap& params) noexcept
+TokenPtr zax::makeInternalToken(CompileStatePtr state) noexcept
+{
+  constexpr StringView internalFilePath{ "[[internal]]" };
+  auto result{ std::make_shared<Token>() };
+  auto filePath{ std::make_shared<SourceTypes::FilePath>() };
+  filePath->filePath_ = internalFilePath;
+  filePath->fullFilePath_ = internalFilePath;
+
+  result->origin_.filePath_ = filePath;
+  result->origin_.location_.line_ = 0;
+  result->origin_.location_.column_ = 0;
+  result->actualOrigin_ = result->origin_;
+  result->compileState_ = state;
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+void zax::output(InformationalTypes::Informational informational, const TokenConstPtr& token, const StringMap& params) noexcept
 {
   assert(token);
 
@@ -35,7 +53,7 @@ void zax::output(InformationalTypes::Informational informational, TokenPtr token
 }
 
 //-----------------------------------------------------------------------------
-void zax::output(WarningTypes::Warning warning, TokenPtr token, const StringMap& params) noexcept
+void zax::output(WarningTypes::Warning warning, const TokenConstPtr& token, const StringMap& params) noexcept
 {
   assert(token);
   assert(token->origin_.filePath_);
@@ -56,7 +74,7 @@ void zax::output(WarningTypes::Warning warning, TokenPtr token, const StringMap&
 }
 
 //-----------------------------------------------------------------------------
-void zax::output(ErrorTypes::Error error, TokenPtr token, const StringMap& params) noexcept
+void zax::output(ErrorTypes::Error error, const TokenConstPtr& token, const StringMap& params) noexcept
 {
   assert(token);
   assert(token->origin_.filePath_);
@@ -75,7 +93,26 @@ void zax::output(ErrorTypes::Error error, TokenPtr token, const StringMap& param
 }
 
 //-----------------------------------------------------------------------------
-void zax::throwException(ErrorTypes::Error error, TokenPtr token, const StringMap& params) noexcept(false)
+void zax::fatal(ErrorTypes::Error error, const TokenConstPtr& token, const StringMap& params) noexcept
+{
+  assert(token);
+  assert(token->origin_.filePath_);
+
+  zax::output(
+    CompilerException{
+      CompilerException::ErrorType::Fatal,
+      token->origin_.filePath_->filePath_,
+      token->origin_.location_.line_,
+      token->origin_.location_.column_,
+      String{ ErrorTypes::ErrorTraits::toString(error) },
+      stringReplace(ErrorTypes::ErrorHumanReadableTraits::toString(error), params)
+    }
+  );
+  output(InformationalTypes::Informational::ActualOrigin, token);
+}
+
+//-----------------------------------------------------------------------------
+void zax::throwException(ErrorTypes::Error error, const TokenConstPtr& token, const StringMap& params) noexcept(false)
 {
   assert(token);
   assert(token->origin_.filePath_);

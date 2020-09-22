@@ -4,6 +4,7 @@
 #include "version.h"
 #include "Config.h"
 #include "CompilerException.h"
+#include "zax.h"
 
 using namespace zax;
 using namespace std::literals::string_literals;
@@ -16,12 +17,19 @@ int runAllTests() noexcept;
 namespace
 {
 
-struct Output
+struct Singleton
 {
   bool quiet_{};
   int errorNumber_{};
+  int totalFatals_{};
   int totalErrors_{};
   int totalWarnings_{};
+
+  constexpr static inline int DefaultMaxErrors{ 20 };
+  constexpr static inline std::optional<int> DefaultMaxWarnings{};
+
+  int maxErrors_{ DefaultMaxErrors };
+  std::optional<int> maxWarnings_{ DefaultMaxWarnings };
 
   void write(const StringStream& ss, bool forceOutput = {}) noexcept
   {
@@ -33,9 +41,9 @@ struct Output
 };
 
 //-----------------------------------------------------------------------------
-Output& singleton() noexcept
+Singleton& singleton() noexcept
 {
-  static Output value{};
+  static Singleton value{};
   return value;
 }
 
@@ -73,6 +81,14 @@ void showHelp() noexcept
   ss << "  --listing <file>          listing file\n";
   ss << "\n";
   ss << "  --tab <size>              specifies default input file tab size\n";
+  ss << "\n";
+  ss << "  --max-errors <size>       specifies the maximum errors before aborting\n";
+  ss << "                            (default=" << Singleton::DefaultMaxErrors <<  ")\n";
+  ss << "\n";
+  ss << "  --max-warnings <size>     specifies the maximum warnings before aborting\n";
+  if (Singleton::DefaultMaxWarnings) {
+    ss << "                            (default=" << (*Singleton::DefaultMaxWarnings) << ")\n";
+  }
   ss << "\n";
 #ifdef ZAX_INCLUDE_TESTS
   ss << "  --test                    run unit tests\n";
@@ -117,14 +133,34 @@ void showIllegalOption(const std::string& arg) noexcept
 //-----------------------------------------------------------------------------
 void zax::output(const CompilerException& exception) noexcept
 {
-  StringStream ss;
-  ss << exception.what();
   switch (exception.type_) {
     case CompilerException::ErrorType::Informational:   break;
-    case CompilerException::ErrorType::Warning:         ++singleton().totalWarnings_; break;
-    case CompilerException::ErrorType::Error:           ++singleton().totalErrors_; singleton().error(-1); break;
-    case CompilerException::ErrorType::Fatal:           ++singleton().totalErrors_; singleton().error(-2); break;
+    case CompilerException::ErrorType::Warning: {
+      ++singleton().totalWarnings_;
+
+      if (singleton().maxWarnings_) {
+        if (singleton().totalWarnings_ > (*singleton().maxWarnings_))
+          return;
+      }
+      break;
+    }
+    case CompilerException::ErrorType::Error: {
+      ++singleton().totalErrors_;
+      singleton().error(-1);
+      if (singleton().totalErrors_ > singleton().maxErrors_)
+        return;
+      break;
+    }
+    case CompilerException::ErrorType::Fatal: {
+      ++singleton().totalErrors_;
+      ++singleton().totalFatals_;
+      singleton().error(-2);
+      break;
+    }
   }
+
+  StringStream ss;
+  ss << exception.what();
   singleton().write(ss);
 }
 
@@ -138,6 +174,20 @@ int zax::totalErrors() noexcept
 int zax::totalWarnings() noexcept
 {
   return singleton().totalWarnings_;
+}
+
+//-----------------------------------------------------------------------------
+bool zax::shouldAbort() noexcept
+{
+  if (singleton().totalFatals_ > 0)
+    return true;
+  if (singleton().totalErrors_ > singleton().maxErrors_)
+    return true;
+  if (!singleton().maxWarnings_)
+    return false;
+  if (singleton().totalWarnings_ > *(singleton().maxWarnings_))
+    return true;
+  return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -234,6 +284,10 @@ int main(int argn, char const* argv[])
         if (0 == lastOption.compare("listing"))
           continue;
         if (0 == lastOption.compare("tab"))
+          continue;
+        if (0 == lastOption.compare("max-errors"))
+          continue;
+        if (0 == lastOption.compare("max-warnings"))
           continue;
         if (0 == lastOption.compare("metadata"))
           continue;

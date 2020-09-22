@@ -178,13 +178,14 @@ String zax::locateFile(
 
 //-----------------------------------------------------------------------------
 void zax::locateWildCardFiles(
-  std::list<std::pair<String, String>>& outFoundFilePaths,
+  std::list<LocateWildCardFilesResult>& outFoundFilePaths,
   const StringView currentFile,
   const StringView newFileWithWildCards,
   bool useAbsolutePath) noexcept
 {
   using Path = std::filesystem::path;
   using PathList = std::list<Path>;
+  using ResultList = std::list<LocateWildCardFilesResult>;
 
   struct HasWild {
     static bool hasWild(const StringView str) noexcept {
@@ -196,7 +197,7 @@ void zax::locateWildCardFiles(
   if (!HasWild::hasWild(newFileWithWildCards)) {
     String outFullFilePath;
     String result{ locateFile(currentFile, newFileWithWildCards, outFullFilePath) };
-    outFoundFilePaths.push_back(std::make_pair(result, outFullFilePath));
+    outFoundFilePaths.emplace_back(result, outFullFilePath, StringList{});
     return;
   }
 
@@ -228,14 +229,15 @@ void zax::locateWildCardFiles(
 
     struct WildMatcher {
       static void wildMatch(
-        PathList& outFoundFiles,
+        ResultList& outFoundFiles,
         Path basePath,
-        PathList exploreComponents) noexcept {
+        PathList exploreComponents,
+        const StringList& foundMatches) noexcept {
         std::error_code ec{};
 
         if (exploreComponents.empty()) {
           if (std::filesystem::is_regular_file(basePath, ec))
-            outFoundFiles.push_back(basePath);
+            outFoundFiles.emplace_back(basePath.string(), String{}, foundMatches);
           return;
         }
 
@@ -244,7 +246,7 @@ void zax::locateWildCardFiles(
 
         if (!HasWild::hasWild(matchEntry.string())) {
           basePath /= matchEntry;
-          return wildMatch(outFoundFiles, basePath, exploreComponents);
+          return wildMatch(outFoundFiles, basePath, exploreComponents, foundMatches);
         }
 
         // wild card matching is required
@@ -260,12 +262,14 @@ void zax::locateWildCardFiles(
 
         struct HumbleMatcher {
           static bool humbleMatch(
-            PathList& outFoundFiles,
-            PathList& exploreComponents,
+            ResultList& outFoundFiles,
+            const PathList& exploreComponents,
+            StringList foundMatches,
             const Path& basePath,
             const Path& matchEntry,
             const Path& entry,
-            decltype(String::npos) greediness) {
+            std::remove_const_t<decltype(String::npos)> greediness) {
+
             String wildStr{ matchEntry.string() };
             auto posQuestion{ wildStr.find("?") };
             auto posStar{ wildStr.find("*") };
@@ -275,7 +279,7 @@ void zax::locateWildCardFiles(
                 return false;
               // no more wild card, direct match check
               auto useBasePath{ basePath / entry };
-              wildMatch(outFoundFiles, useBasePath, exploreComponents);
+              wildMatch(outFoundFiles, useBasePath, exploreComponents, foundMatches);
               return true;
             }
 
@@ -305,6 +309,8 @@ void zax::locateWildCardFiles(
               StringView postfixWp{ wp.substr(posFirst + 1) }; // account for the extracted wild character
               StringView postfixEs{ es.substr(posFirst + useGreed) }; // account for the borrowed string
 
+              foundMatches.emplace_back(borrowStr);
+
               String useMatchStr;
               useMatchStr.reserve(prefixWp.size() + borrowStr.size() + postfixWp.size());
               String useEsStr;
@@ -317,11 +323,12 @@ void zax::locateWildCardFiles(
               useEsStr += prefixWp;
               useEsStr += borrowStr;
               useEsStr += postfixEs;
-              if (humbleMatch(outFoundFiles, exploreComponents, basePath, Path{ useMatchStr }, Path{ useEsStr }, 0))
+              if (humbleMatch(outFoundFiles, exploreComponents, foundMatches, basePath, Path{ useMatchStr }, Path{ useEsStr }, 0))
                 return true;
               if (!increaseGreed)
                 return false;
-              return humbleMatch(outFoundFiles, exploreComponents, basePath, matchEntry, entry, useGreed + 1);
+              foundMatches.pop_back();
+              return humbleMatch(outFoundFiles, exploreComponents, foundMatches, basePath, matchEntry, entry, useGreed + 1);
             } };
 
             if (posFirst == posQuestion)
@@ -331,21 +338,22 @@ void zax::locateWildCardFiles(
         };
 
         for (auto& checkEntry : entries) {
-          HumbleMatcher::humbleMatch(outFoundFiles, exploreComponents, basePath, matchEntry, checkEntry , 0);
+          HumbleMatcher::humbleMatch(outFoundFiles, exploreComponents, foundMatches, basePath, matchEntry, checkEntry , 0);
         }
       }
     };
 
-    PathList foundResults;
-    WildMatcher::wildMatch(foundResults, basePath, exploreComponents);
+    ResultList foundResults;
+    WildMatcher::wildMatch(foundResults, basePath, exploreComponents, StringList{});
 
     if (foundResults.size() > 0) {
-      for (auto& path : foundResults) {
+      for (auto& pathResult : foundResults) {
+        Path path{ pathResult.path_ };
 
         assert(std::filesystem::is_regular_file(path, ec));
         auto absPath = std::filesystem::absolute(path, ec);
 
-        outFoundFilePaths.push_back(std::make_pair(path.string(), absPath.string()));
+        outFoundFilePaths.emplace_back(pathResult.path_, absPath.string(), pathResult.foundMatches_);
       }
       return;
     }

@@ -7,6 +7,7 @@
 
 #include "../src/helpers.h"
 
+using StringList = zax::StringList;
 
 namespace zaxTest
 {
@@ -136,10 +137,36 @@ struct HelperBasics
     TEST(zax::writeBinaryFile(path4 + "/hellobbc.txt", "hello3"));
     TEST(zax::writeBinaryFile(path4 + "/helloabc.txt", "hello4"));
 
-    std::list<std::pair<std::string, std::string>> found;
+    std::list<zax::LocateWildCardFilesResult> found;
     zax::locateWildCardFiles(found, "ignored/fruit/apple_fruit/test.txt", "test/fr*/*_?ruit/hello*.txt");
+
+    auto validate{ [&](const std::string& path, const StringList& matches) noexcept -> bool {
+      for (auto& entry : found) {
+        std::string normalizedEntryPath{ zax::stringReplace(entry.path_, "\\", "/") };
+        if (normalizedEntryPath != path)
+          continue;
+        TEST(matches.size() == entry.foundMatches_.size());
+        for (auto& match : matches) {
+          auto found{ entry.foundMatches_.front() };
+          TEST(found == match);
+          entry.foundMatches_.pop_front();
+        }
+        return true;
+      }
+      return false;
+    } };
     
     TEST(found.size() == 10);
+    TEST(validate("ignored/test/fruit/apple_fruit/hello.txt", StringList{ "uit", "apple", "f", "" }));
+    TEST(validate("ignored/test/fruit/apple_fruit/helloa.txt", StringList{ "uit", "apple", "f", "a" }));
+    TEST(validate("ignored/test/fruit/apple_fruit/helloab.txt", StringList{ "uit", "apple", "f", "ab" }));
+    TEST(validate("ignored/test/fruit/apple_fruit/helloabc.txt", StringList{ "uit", "apple", "f", "abc" }));
+    TEST(validate("ignored/test/fruit/apple_fruit/hellobbc.txt", StringList{ "uit", "apple", "f", "bbc" }));
+    TEST(validate("ignored/test/fruit/banana_fruit/hello.txt", StringList{ "uit", "banana", "f", "" }));
+    TEST(validate("ignored/test/fruit/banana_fruit/helloa.txt", StringList{ "uit", "banana", "f", "a" }));
+    TEST(validate("ignored/test/fruit/banana_fruit/helloab.txt", StringList{ "uit", "banana", "f", "ab" }));
+    TEST(validate("ignored/test/fruit/banana_fruit/helloabc.txt", StringList{ "uit", "banana", "f", "abc" }));
+    TEST(validate("ignored/test/fruit/banana_fruit/hellobbc.txt", StringList{ "uit", "banana", "f", "bbc" }));
 
     output(__FILE__ "::" __FUNCTION__);
   }

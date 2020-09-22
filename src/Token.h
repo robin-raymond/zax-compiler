@@ -105,6 +105,7 @@ struct TokenTypes
     SequentialAllocate,
     NameResolution,
     Comma,
+    StatementSeparator,
     SubStatementSeparator,
     TypeDeclare,
     MetaDeclare,
@@ -143,7 +144,7 @@ struct TokenTypes
   };
 
   
-  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 99>
+  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 100>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -213,6 +214,7 @@ struct TokenTypes
         { Operator::SequentialAllocate, "@!" },
         { Operator::NameResolution, "." },
         { Operator::Comma, "," },
+        { Operator::StatementSeparator, ";" },
         { Operator::SubStatementSeparator, ";;" },
         { Operator::TypeDeclare, ":" },
         { Operator::MetaDeclare, "::" },

@@ -7,6 +7,7 @@
 #include "TokenList.h"
 #include "Source.h"
 #include "Errors.h"
+#include "Warnings.h"
 
 namespace zax {
 
@@ -88,12 +89,15 @@ public:
   SourceTypes::FilePathPtr filePath_;
   SourceTypes::FilePathPtr actualFilePath_;
   std::pair< std::unique_ptr<std::byte[]>, size_t> rawContents_;
+  const std::byte* raw_{};
   CompileStatePtr compileState_;
   OperatorLutConstPtr operatorLut_;
 
   ParserPos parserPos_;
+  bool skipComments_{};
 
-  std::function<void(ErrorTypes::Error, TokenPtr)> errorCallback_;
+  std::function<void(ErrorTypes::Error, const TokenConstPtr&, const StringMap&)> errorCallback_;
+  std::function<void(WarningTypes::Warning, const TokenConstPtr&, const StringMap&)> warningCallback_;
 
 public:
 
@@ -103,6 +107,9 @@ public:
     const CompileStatePtr& compileState,
     const OperatorLutConstPtr& operatorLut
   ) noexcept;
+  Tokenizer(
+    const Tokenizer& original,
+    TokenList&& tokenList) noexcept;
   ~Tokenizer() noexcept;
 
   static void count(ParserPos& parserPos, char let) noexcept;
@@ -222,7 +229,7 @@ public:
       return *this;
     }
 
-    [[nodiscard]] bool empty() noexcept
+    [[nodiscard]] bool empty() const noexcept
     {
       return list_ ? list_->empty() : true;
     }
@@ -335,18 +342,47 @@ public:
       return *this;
     }
 
-    [[nodiscard]] decltype(auto) operator*() const noexcept {
+    [[nodiscard]] TokenPtr operator*() noexcept {
       assert(list_);
-      assert(list_->size() > 0);
-      if (iterator_ == list_->tokenListEnd()) {
-        auto temp{ *this };
-        --temp;
-        return *(temp.iterator_);
-      }
+      if (iterator_ == list_->tokenListEnd())
+        return TokenPtr{};
       return *iterator_;
     }
 
-    [[nodiscard]] decltype(auto) operator->() const noexcept { return &(*(*this)); }
+    [[nodiscard]] TokenConstPtr operator*() const noexcept {
+      assert(list_);
+      if (iterator_ == list_->tokenListEnd())
+        return TokenPtr{};
+      return *iterator_;
+    }
+
+    [[nodiscard]] decltype(auto) operator->() noexcept {
+      assert(list_);
+      assert(list_->size() > 0);
+      if (iterator_ == list_->tokenListEnd()) {
+        auto last{ list_->end() };
+        --last;
+        return &(*last);
+      }
+      return &(*iterator_);
+    }
+
+    [[nodiscard]] decltype(auto) operator->() const noexcept {
+      assert(list_);
+      assert(list_->size() > 0);
+      if (iterator_ == list_->tokenListEnd()) {
+        auto last{ list_->cend() };
+        --last;
+        return &(*last);
+      }
+      return &(*iterator_);
+    }
+
+    [[nodiscard]] decltype(auto) operator[](index_type distance) noexcept {
+      auto temp{ *this };
+      temp += distance;
+      return *temp;
+    }
 
     [[nodiscard]] decltype(auto) operator[](index_type distance) const noexcept {
       auto temp{ *this };
@@ -388,6 +424,12 @@ public:
   TokenPtr popFront() noexcept;
   TokenPtr popBack() noexcept;
 
+  TokenPtr front() noexcept;
+  TokenPtr back() noexcept;
+
+  TokenConstPtr front() const noexcept;
+  TokenConstPtr back() const noexcept;
+
   void extractThenPushFront(TokenList& rhs) noexcept;
   void extractThenPushBack(TokenList& rhs) noexcept;
 
@@ -408,13 +450,15 @@ public:
   [[nodiscard]] const_iterator cend() const noexcept { return const_iterator{ *this, tokenListCEnd() }; }
 
   [[nodiscard]] TokenPtr operator[](index_type pos) noexcept;
-  [[nodiscard]] const TokenPtr operator[](index_type pos) const noexcept;
+  [[nodiscard]] const TokenConstPtr operator[](index_type pos) const noexcept;
 
   [[nodiscard]] iterator at(index_type pos) noexcept;
   [[nodiscard]] const_iterator at(index_type pos) const noexcept;
 
   [[nodiscard]] bool empty() const noexcept;
   [[nodiscard]] size_type size() const noexcept;  // size is a lazy projection and does not represent "true" size
+
+  void clear() noexcept;
 
   [[nodiscard]] bool hasAhead(iterator pos, index_type count) noexcept { assert(&(pos.list()) == this); return pos.hasAhead(count); }
   [[nodiscard]] bool hasBehind(iterator pos, index_type count) noexcept { assert(&(pos.list()) == this); return pos.hasBehind(count); }
@@ -424,6 +468,7 @@ public:
 
   [[nodiscard]] TokenList extract(iterator first, iterator last) noexcept;
   [[nodiscard]] TokenList extract(iterator first, index_type count) noexcept;
+  [[nodiscard]] TokenList extract(index_type first, index_type count) noexcept;
 
   [[nodiscard]] TokenList extractFromStartToPos(iterator pos) noexcept;
   [[nodiscard]] TokenList extractFromPosToEnd(iterator pos) noexcept;
@@ -442,6 +487,9 @@ public:
 private:
   void ensurePosExists(index_type pos) noexcept;
   void ensurePosExists(index_type pos) const noexcept;
+
+  void out(ErrorTypes::Error error, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
+  void out(WarningTypes::Warning warning, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
 };
 
 

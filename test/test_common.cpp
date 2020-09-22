@@ -96,8 +96,9 @@ int runAllTests() noexcept
   try {
     testHelpers();
     testOperatorLut();
-    testTokenizer();
     testTokenList();
+    testTokenizer();
+    testCompiler();
   }
   catch (...) {
     std::cout << "ERROR: uncaught exception thrown!\n";
