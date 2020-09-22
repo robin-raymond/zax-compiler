@@ -2438,6 +2438,15 @@ struct TokenizerInstance
 
       {
         auto token{ *iter };
+        validate(token, 1, 3);
+        TEST(token->type_ == zax::Token::Type::Comment);
+        TEST(token->originalToken_ == "// ignore me");
+        TEST(token->token_ == " ignore me");
+        ++iter;
+        TEST(iter != std::end(get()));
+      }
+      {
+        auto token{ *iter };
         validate(token, 2, 1);
         TEST(token->type_ == zax::Token::Type::Literal);
         TEST(token->originalToken_ == "hello");
@@ -2454,6 +2463,15 @@ struct TokenizerInstance
 
       auto iter{ std::begin(get()) };
 
+      {
+        auto token{ *iter };
+        validate(token, 1, 3);
+        TEST(token->type_ == zax::Token::Type::Comment);
+        TEST(token->originalToken_ == "/* ignore me\n*/");
+        TEST(token->token_ == " ignore me\n");
+        ++iter;
+        TEST(iter != std::end(get()));
+      }
       {
         auto token{ *iter };
         validate(token, 2, 3);

@@ -629,6 +629,7 @@ void Tokenizer::primeNext() noexcept
 
   auto comment{ [&](
     bool skipComments,
+    bool allowedToInsertNewLine,
     bool& outDidConsumeComment,
     bool& outContainedNewline) noexcept -> bool {
     auto value{ consumeComment(parserPos_) };
@@ -646,7 +647,8 @@ void Tokenizer::primeNext() noexcept
 
     if (value->addNewLine_) {
       outContainedNewline = true;
-      if (!skipComments) {
+      if ((!skipComments) &&
+          (allowedToInsertNewLine)) {
         auto tokenNewLine{ makeToken() };
         tokenNewLine->type_ = TokenTypes::Type::Separator;
         tokenNewLine->originalToken_ = value->originalToken_;
@@ -755,7 +757,7 @@ void Tokenizer::primeNext() noexcept
       oldPos = parserPos_;
       continue;
     }
-    if (comment(skipComments_, didConsume, containedNewline))
+    if (comment(skipComments_, true, didConsume, containedNewline))
       return;
     if (didConsume) {
       oldPos = parserPos_;
@@ -777,7 +779,7 @@ void Tokenizer::primeNext() noexcept
         oldPos = parserPos_;
         didConsume = false;
         containedNewline = false;
-        (void)comment(true, didConsume, containedNewline);
+        (void)comment(skipComments_, false, didConsume, containedNewline);
         if (containedNewline)
           break;
 
