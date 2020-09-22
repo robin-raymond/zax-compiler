@@ -13,38 +13,38 @@ using namespace zax;
 using namespace std::string_view_literals;
 
 //-----------------------------------------------------------------------------
-bool Compiler::consumeLineCompilerDirective(Tokenizer& tokenizer) noexcept
+bool Compiler::consumeLineCompilerDirective(Context& context) noexcept
 {
-  if (isOperator(tokenizer.front(), Operator::DirectiveOpen))
+  if (isOperator(context->front(), Operator::DirectiveOpen))
     return false;
 
-  auto iter{ tokenizer.begin() + 1 };
+  auto iter{ context->begin() + 1 };
 
   auto literal{ *iter };
   if (!isLiteral(literal)) {
     out(Warning::DirectiveNotUnderstood, literal);
-    (void)consumeAfter(skipUntil(tokenizer, isOperatorFunc(Operator::DirectiveClose)));
+    (void)consumeAfter(skipUntil(*context, isOperatorFunc(Operator::DirectiveClose)));
     return true;
   }
   ++iter;
 
   if ("asset"sv == literal->token_) {
     (void)consumeAfter(iter);
-    return consumeAssetOrSourceDirective(tokenizer, false);
+    return consumeAssetOrSourceDirective(context, false);
   }
 
   if ("source"sv == literal->token_) {
     (void)consumeAfter(iter);
-    return consumeAssetOrSourceDirective(tokenizer, true);
+    return consumeAssetOrSourceDirective(context, true);
   }
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::consumeAssetOrSourceDirective(Tokenizer& tokenizer, bool isSource) noexcept
+bool Compiler::consumeAssetOrSourceDirective(Context& context, bool isSource) noexcept
 {
-  auto iter{ tokenizer.begin() };
+  auto iter{ context->begin() };
 
   SourceAssetDirective asset;
   asset.token_ = validOrLastValid(iter, *iter);
@@ -113,9 +113,9 @@ bool Compiler::consumeAssetOrSourceDirective(Tokenizer& tokenizer, bool isSource
   }
 
   if (isSource)
-    handleSource(asset);
+    handleSource(context, asset);
   else
-    handleAsset(asset);
+    handleAsset(context, asset);
 
   return true;
 }
@@ -190,11 +190,11 @@ Tokenizer::iterator Compiler::extractDirectiveEqualsLiteral(
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::handleAsset(SourceAssetDirective& asset) noexcept
+void Compiler::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
 {
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::handleSource(SourceAssetDirective& source) noexcept
+void Compiler::handleSource(Context& context, SourceAssetDirective& source) noexcept
 {
 }

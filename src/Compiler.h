@@ -105,6 +105,17 @@ struct CompilerOtherTypes
   };
 
   using SourceAssetList = std::list<SourceAsset>;
+
+  struct Context
+  {
+    Tokenizer* tokenizer_{};
+
+    Tokenizer& operator*() noexcept { return *tokenizer_; }
+    const Tokenizer& operator*() const noexcept { return *tokenizer_; }
+
+    Tokenizer* operator->() noexcept { return tokenizer_; }
+    const Tokenizer* operator->() const noexcept { return tokenizer_; }
+  };
 };
 
 //-----------------------------------------------------------------------------
@@ -139,10 +150,10 @@ struct Compiler : public CompilerTypes,
   Compiler& operator=(Compiler&&) noexcept = delete;
 
   void compile() noexcept;
-  void process(Tokenizer& tokenizer) noexcept;
+  void process(Context& context) noexcept;
 
-  [[nodiscard]] bool consumeLineCompilerDirective(Tokenizer& tokenizer) noexcept;
-  bool consumeAssetOrSourceDirective(Tokenizer& tokenizer, bool isSource) noexcept;
+  [[nodiscard]] bool consumeLineCompilerDirective(Context& context) noexcept;
+  bool consumeAssetOrSourceDirective(Context& context, bool isSource) noexcept;
 
   [[nodiscard]] Tokenizer::iterator extractDirectiveEqualsQuoteOrResolveLater(
     Tokenizer::iterator iter,
@@ -160,8 +171,8 @@ struct Compiler : public CompilerTypes,
   [[nodiscard]] static Tokenizer::iterator skipUntilAfter(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept;
   [[nodiscard]] static Tokenizer::iterator skipUntilAfter(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept;
 
-  [[nodiscard]] bool consumeSeparator(Tokenizer& tokenizer, bool forcedOkay) noexcept;
-  [[nodiscard]] bool consumeSeparators(Tokenizer& tokenizer, bool forcedOkay) noexcept;
+  [[nodiscard]] bool consumeSeparator(Context& context, bool forcedOkay) noexcept;
+  [[nodiscard]] bool consumeSeparators(Context& context, bool forcedOkay) noexcept;
 
   Tokenizer::iterator consumeTo(Tokenizer::iterator  iter) noexcept;
   [[nodiscard]] Tokenizer::iterator consumeAfter(Tokenizer::iterator  iter) noexcept;
@@ -171,8 +182,8 @@ struct Compiler : public CompilerTypes,
 
   TokenizerPtr extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept;
 
-  void handleAsset(SourceAssetDirective&) noexcept;
-  void handleSource(SourceAssetDirective&) noexcept;
+  void handleAsset(Context& context, SourceAssetDirective&) noexcept;
+  void handleSource(Context& context, SourceAssetDirective&) noexcept;
 
   static bool isOperator(const TokenConstPtr& token, Operator oper) noexcept;
   static bool isLiteral(const TokenConstPtr& token) noexcept;

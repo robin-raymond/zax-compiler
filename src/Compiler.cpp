@@ -54,17 +54,19 @@ void Compiler::compile() noexcept
       continue;
     }
 
-    process(tokenizer);
+    Context context;
+    context.tokenizer_ = &tokenizer;
+    process(context);
   }
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::process(Tokenizer& tokenizer) noexcept
+void Compiler::process(Context& context) noexcept
 {
-  while ((!shouldAbort()) && (!tokenizer.empty())) {
-    if (consumeSeparators(tokenizer, false))
+  while ((!shouldAbort()) && (!context->empty())) {
+    if (consumeSeparators(context, false))
       continue;
-    if (consumeLineCompilerDirective(tokenizer))
+    if (consumeLineCompilerDirective(context))
       continue;
   }
 }
@@ -100,9 +102,9 @@ Tokenizer::iterator Compiler::skipUntilAfter(std::function<bool(const TokenPtr&)
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::consumeSeparator(Tokenizer& tokenizer, bool forcedOkay) noexcept
+bool Compiler::consumeSeparator(Context& context, bool forcedOkay) noexcept
 {
-  auto token{ tokenizer.front() };
+  auto token{ context->front() };
   if (!isSeparator(token))
     return false;
 
@@ -113,15 +115,15 @@ bool Compiler::consumeSeparator(Tokenizer& tokenizer, bool forcedOkay) noexcept
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::consumeSeparators(Tokenizer& tokenizer, bool forcedOkay) noexcept
+bool Compiler::consumeSeparators(Context& context, bool forcedOkay) noexcept
 {
   bool consumed{};
   while (true) {
-    auto token{ tokenizer.front() };
+    auto token{ context->front() };
     if (!isSeparator(token))
       break;
 
-    tokenizer.popFront();
+    context->popFront();
 
     consumed = true;
     if ((!forcedOkay) && (token->forcedSeparator_)) {
