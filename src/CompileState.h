@@ -44,6 +44,8 @@ struct CompileState
   } functionDefault_;
 
   bool isWarningAnError(WarningTypes::Warning warning) noexcept;
+
+  static CompileStatePtr fork(const CompileStateConstPtr& original) noexcept;
 };
 
 } // namespace zax

@@ -19,9 +19,12 @@ using StringView = std::string_view;
 using StringList = std::list<String>;
 using StringViewList = std::list<StringView>;
 using StringMap = std::map<String, String>;
+using StringSet = std::set<String>;
 using StringViewMap = std::map<StringView, StringView>;
 
 using Puid = unsigned int;
+
+using Path = std::filesystem::path;
 
 template <typename T>
 using optional = std::optional<T>;
@@ -29,8 +32,8 @@ using optional = std::optional<T>;
 using index_type = zs::index_type;
 
 ZAX_DECLARE_STRUCT_PTR(CodeBlock);
-ZAX_DECLARE_STRUCT_PTR(Compiler);
-ZAX_DECLARE_STRUCT_PTR(CompilerTypes);
+ZAX_DECLARE_STRUCT_PTR(Parser);
+ZAX_DECLARE_STRUCT_PTR(ParserTypes);
 ZAX_DECLARE_STRUCT_PTR(CompileState);
 ZAX_DECLARE_STRUCT_PTR(CompilerException);
 ZAX_DECLARE_STRUCT_PTR(Config);

@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "Compiler.h"
+#include "Parser.h"
 #include "CompilerException.h"
 #include "CompileState.h"
 #include "OperatorLut.h"
@@ -12,7 +12,7 @@ using namespace std::string_view_literals;
 
 
 //-----------------------------------------------------------------------------
-Compiler::Compiler(
+Parser::Parser(
   const Config& config,
   Callbacks* callbacks) noexcept :
   config_{ config },
@@ -39,10 +39,11 @@ Compiler::Compiler(
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::compile() noexcept
+void Parser::parse() noexcept
 {
   while (!shouldAbort()) {
     prime();
+    processAssets();
 
     if (sources_.empty())
       break;
@@ -55,30 +56,91 @@ void Compiler::compile() noexcept
     }
 
     Context context;
+    context.parser_ = this;
     context.tokenizer_ = &tokenizer;
     process(context);
   }
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::process(Context& context) noexcept
+void Parser::process(Context& context) noexcept
 {
   while ((!shouldAbort()) && (!context->empty())) {
-    if (consumeSeparators(context, false))
+    if ((pendingSources_.size() > 0) || (pendingAssets_.size()> 0))
+      break;
+
+    if (consumeSeparators(context, false)) {
+      context.singleLineState_ = {};
       continue;
-    if (consumeLineCompilerDirective(context))
+    }
+    if (consumeLineParserDirective(context))
       continue;
   }
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::iterator Compiler::skipUntil(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept
+void Parser::processAssets() noexcept
+{
+  if (pendingAssets_.size() < 1)
+    return;
+
+  for (auto& pending : pendingAssets_) {
+    if (pending.generated_) {
+      // TODO: execute pending compile time functions now
+    }
+
+    std::error_code ec;
+    if (pending.renameFilePath_.empty()) {
+      Path useOutputName{ pending.filePath_ };
+      pending.renameFilePath_ = useOutputName.filename().string();
+    }
+
+    if (Path{ pending.renameFilePath_ }.has_root_path()) {
+      out(Error::OutputFailure, pending.token_, StringMap{ {"$file$", pending.renameFilePath_ } });
+      continue;
+    }
+
+    if (String::npos != pending.renameFilePath_.find("..")) {
+      out(Error::OutputFailure, pending.token_, StringMap{ {"$file$", pending.renameFilePath_ } });
+      continue;
+    }
+
+    String fullPath;
+    auto useOutputPath{ makeIncludeFile(config_.outputPath_, pending.renameFilePath_, fullPath) };
+
+    Path parentOutputPath{ Path{ useOutputPath }.parent_path() };
+    if (!parentOutputPath.empty()) {
+      std::filesystem::create_directories(parentOutputPath, ec);
+    }
+
+    Path sourcePath { pending.filePath_ };
+    if (!std::filesystem::is_regular_file(sourcePath)) {
+      out(Error::AssetNotFound, pending.token_, StringMap{ {"$file$", pending.filePath_ } });
+      continue;
+    }
+    Path temp{ pending.renameFilePath_ };
+    std::filesystem::copy_file(
+      Path{ pending.filePath_ },
+      Path{ pending.renameFilePath_ },
+      std::filesystem::copy_options::update_existing,
+      ec
+    );
+    if (ec) {
+      out(Error::OutputFailure, pending.token_, StringMap{ {"$file$", pending.renameFilePath_ } });
+      continue;
+    }
+  }
+  pendingAssets_.clear();
+}
+
+//-----------------------------------------------------------------------------
+Tokenizer::iterator Parser::skipUntil(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept
 {
   return skipUntil(std::move(until), tokenizer.begin());
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::iterator Compiler::skipUntil(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept
+Tokenizer::iterator Parser::skipUntil(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept
 {
   while (!iter.isEnd()) {
     if (until(*iter))
@@ -90,19 +152,19 @@ Tokenizer::iterator Compiler::skipUntil(std::function<bool(const TokenPtr&)>&& u
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::iterator Compiler::skipUntilAfter(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept
+Tokenizer::iterator Parser::skipUntilAfter(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept
 {
   return skipUntilAfter(std::move(until), tokenizer.begin());
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::iterator Compiler::skipUntilAfter(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept
+Tokenizer::iterator Parser::skipUntilAfter(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept
 {
   return skipUntil(std::move(until), iter + 1);
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::consumeSeparator(Context& context, bool forcedOkay) noexcept
+bool Parser::consumeSeparator(Context& context, bool forcedOkay) noexcept
 {
   auto token{ context->front() };
   if (!isSeparator(token))
@@ -115,7 +177,7 @@ bool Compiler::consumeSeparator(Context& context, bool forcedOkay) noexcept
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::consumeSeparators(Context& context, bool forcedOkay) noexcept
+bool Parser::consumeSeparators(Context& context, bool forcedOkay) noexcept
 {
   bool consumed{};
   while (true) {
@@ -134,7 +196,7 @@ bool Compiler::consumeSeparators(Context& context, bool forcedOkay) noexcept
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::iterator Compiler::consumeTo(Tokenizer::iterator  iter) noexcept
+Tokenizer::iterator Parser::consumeTo(Tokenizer::iterator  iter) noexcept
 {
   if (iter.isEnd()) {
     iter.list().clear();
@@ -145,7 +207,7 @@ Tokenizer::iterator Compiler::consumeTo(Tokenizer::iterator  iter) noexcept
 }
 
 //-----------------------------------------------------------------------------
-Tokenizer::iterator Compiler::consumeAfter(Tokenizer::iterator  iter) noexcept
+Tokenizer::iterator Parser::consumeAfter(Tokenizer::iterator  iter) noexcept
 {
   if (iter.isEnd()) {
     iter.list().clear();
@@ -157,7 +219,7 @@ Tokenizer::iterator Compiler::consumeAfter(Tokenizer::iterator  iter) noexcept
 }
 
 //-----------------------------------------------------------------------------
-TokenPtr Compiler::validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) noexcept
+TokenPtr Parser::validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) noexcept
 {
   if (token)
     return token;
@@ -168,13 +230,52 @@ TokenPtr Compiler::validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token)
 }
 
 //-----------------------------------------------------------------------------
-TokenizerPtr Compiler::extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept
+CompileStatePtr Parser::pickState(Context& context, TokenPtr token) noexcept
+{
+  if (context.singleLineState_)
+    return context.singleLineState_;
+  if (token->compileState_)
+    return token->compileState_;
+  return activeState_;
+}
+
+//-----------------------------------------------------------------------------
+TokenizerPtr Parser::extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept
 {
   return std::make_shared<Tokenizer>(first.list(), first.list().extract(first, last));
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::isOperator(const TokenConstPtr& token, Operator oper) noexcept
+ParserTypes::QuoteResult Parser::parseQuote(Tokenizer::iterator iter) noexcept
+{
+  QuoteResult result;
+  result.iter_ = iter;
+  if (iter.isEnd())
+    return result;
+
+  auto token{ *iter };
+  if (!token)
+    return result;
+
+  if (!isQuote(token))
+    return result;
+
+  result.token_ = token;
+  result.quote_ = token->token_;
+  ++result.iter_;
+
+  while (!result.iter_.isEnd()) {
+    token = *result.iter_;
+    if (!isQuote(token))
+      break;
+    result.quote_ += token->token_;
+    ++result.iter_;
+  }
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::isOperator(const TokenConstPtr& token, Operator oper) noexcept
 {
   if (!token)
     return false;
@@ -184,7 +285,7 @@ bool Compiler::isOperator(const TokenConstPtr& token, Operator oper) noexcept
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::isLiteral(const TokenConstPtr& token) noexcept
+bool Parser::isLiteral(const TokenConstPtr& token) noexcept
 {
   if (!token)
     return false;
@@ -192,7 +293,7 @@ bool Compiler::isLiteral(const TokenConstPtr& token) noexcept
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::isSeparator(const TokenConstPtr& token) noexcept
+bool Parser::isSeparator(const TokenConstPtr& token) noexcept
 {
   if (!token)
     return false;
@@ -201,7 +302,7 @@ bool Compiler::isSeparator(const TokenConstPtr& token) noexcept
 
 
 //-----------------------------------------------------------------------------
-bool Compiler::isQuote(const TokenConstPtr& token) noexcept
+bool Parser::isQuote(const TokenConstPtr& token) noexcept
 {
   if (!token)
     return false;
@@ -209,7 +310,7 @@ bool Compiler::isQuote(const TokenConstPtr& token) noexcept
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::isCommaOrCloseDirective(const TokenConstPtr& token) noexcept
+bool Parser::isCommaOrCloseDirective(const TokenConstPtr& token) noexcept
 {
   if (isOperator(token, Operator::Comma))
     return true;
@@ -219,7 +320,7 @@ bool Compiler::isCommaOrCloseDirective(const TokenConstPtr& token) noexcept
 }
 
 //-----------------------------------------------------------------------------
-std::function<bool(const TokenConstPtr& token)> Compiler::isOperatorFunc(Operator oper) noexcept
+std::function<bool(const TokenConstPtr& token)> Parser::isOperatorFunc(Operator oper) noexcept
 {
   return [oper](const TokenConstPtr& token) noexcept -> bool {
     if (!token)
@@ -232,12 +333,9 @@ std::function<bool(const TokenConstPtr& token)> Compiler::isOperatorFunc(Operato
 
 
 //-----------------------------------------------------------------------------
-void Compiler::prime() noexcept
+void Parser::prime() noexcept
 {
   if (shouldAbort())
-    return;
-
-  if (sources_.size() > 0)
     return;
 
   if (pendingSources_.size() < 1) {
@@ -259,6 +357,7 @@ void Compiler::prime() noexcept
     config_.inputFilePaths_.clear();
   }
 
+  SourceList pushFrontSourceList;
   for (auto& pending : pendingSources_) {
     if (pending.generated_) {
       // TODO: execute pending compile time functions now
@@ -279,12 +378,15 @@ void Compiler::prime() noexcept
           break;
         }
         case SourceAssetRequired::Warn: {
-          out(Error::SourceNotFound, pending.token_, StringMap{ {"$file$", pending.filePath_} });
+          out(Warning::SourceNotFound, pending.token_, StringMap{ {"$file$", pending.filePath_} });
           break;
         }
       }
       continue;
     }
+
+    if (!alreadyIncludedSources_.insert(pending.fullFilePath_).second)
+      continue;
 
     auto source{ std::make_shared<Source>() };
     source->module_ = rootModule_;
@@ -301,44 +403,48 @@ void Compiler::prime() noexcept
     source->tokenizer_->skipComments_ = true;
     source->tokenizer_->errorCallback_ = callbacks_.error_;
     source->tokenizer_->warningCallback_ = callbacks_.warning_;
-    sources_.push_back(source);
+    pushFrontSourceList.push_back(source);
+  }
+  if (pushFrontSourceList.size() > 0) {
+    sources_.insert(sources_.begin(), pushFrontSourceList.begin(), pushFrontSourceList.end());
   }
   pendingSources_.clear();
 }
 
+
 //-----------------------------------------------------------------------------
-Tokenizer& Compiler::getTokenizer() noexcept
+Tokenizer& Parser::getTokenizer() noexcept
 {
   assert(!sources_.empty());
   return *(sources_.front()->tokenizer_);
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::fatal(Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept
+void Parser::fatal(Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept
 {
   callbacks_.fatal_(error, token, mapping);
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::out(Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept
+void Parser::out(Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept
 {
   callbacks_.error_(error, token, mapping);
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::out(Warning warning, const TokenConstPtr& token, const StringMap& mapping) noexcept
+void Parser::out(Warning warning, const TokenConstPtr& token, const StringMap& mapping) noexcept
 {
   callbacks_.warning_(warning, token, mapping);
 }
 
 //-----------------------------------------------------------------------------
-void Compiler::out(Informational info, const TokenConstPtr& token, const StringMap& mapping) noexcept
+void Parser::out(Informational info, const TokenConstPtr& token, const StringMap& mapping) noexcept
 {
   callbacks_.info_(info, token, mapping);
 }
 
 //-----------------------------------------------------------------------------
-bool Compiler::shouldAbort() noexcept
+bool Parser::shouldAbort() noexcept
 {
   return callbacks_.shouldAbort_();
 }

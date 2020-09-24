@@ -56,10 +56,11 @@ struct ErrorTypes
     ScopeFlowControlSkipsDeclaration,
     InlineFunctionNotFinal,
     ConstantSyntax,
-    Syntax
+    Syntax,
+    OutputFailure
   };
 
-  struct ErrorDeclare final : public zs::EnumDeclare<Error, 46>
+  struct ErrorDeclare final : public zs::EnumDeclare<Error, 47>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -109,12 +110,13 @@ struct ErrorTypes
         {Error::ScopeFlowControlSkipsDeclaration, "scope-flow-control-skips-declaration"},
         {Error::InlineFunctionNotFinal, "inline-function-not-final"},
         {Error::ConstantSyntax, "constant-syntax"},
-        {Error::Syntax, "syntax"}
+        {Error::Syntax, "syntax"},
+        {Error::OutputFailure, "output-failure"}
       } };
     }
   };
 
-  struct ErrorHumanReadableDeclare final : public zs::EnumDeclare<Error, 46>
+  struct ErrorHumanReadableDeclare final : public zs::EnumDeclare<Error, 47>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -127,7 +129,7 @@ struct ErrorTypes
         {Error::ImportedModuleNotFound, "imported-module-not-found"},
         {Error::ImportedModuleFailure, "imported-module-failure"},
         {Error::SourceNotFound, "a source file ($file$) was requested to be parsed but it cannot be located"},
-        {Error::AssetNotFound, "asset-not-found"},
+        {Error::AssetNotFound, "an asset file ($file$) was requested to be copied but it cannot be located"},
         {Error::WildCharacterMismatch, "wild-character-mismatch"},
         {Error::FinalFunctionPointsToNothing, "final-function-points-to-nothing"},
         {Error::DereferencePointerToNothing, "dereference-pointer-to-nothing"},
@@ -164,7 +166,8 @@ struct ErrorTypes
         {Error::ScopeFlowControlSkipsDeclaration, "scope-flow-control-skips-declaration"},
         {Error::InlineFunctionNotFinal, "inline-function-not-final"},
         {Error::ConstantSyntax, "a constant was found to contain a syntax error"},
-        {Error::Syntax, "a syntax error was found"}
+        {Error::Syntax, "a syntax error was found"},
+        {Error::OutputFailure, "an attempt to generate output or copy an asset to the output ($file$) failed"}
       } };
     }
   };

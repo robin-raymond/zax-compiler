@@ -14,7 +14,7 @@ namespace zax
 {
 
   //-----------------------------------------------------------------------------
-  struct CompilerTypes
+  struct ParserTypes
 {
   using Operator = TokenTypes::Operator;
   using Error = ErrorTypes::Error;
@@ -36,10 +36,15 @@ namespace zax
     std::function<bool()> shouldAbort_;
   };
 
+  struct QuoteResult {
+    TokenPtr token_;
+    String quote_;
+    Tokenizer::iterator iter_;
+  };
 };
 
 //-----------------------------------------------------------------------------
-struct CompileDirectiveTypes
+struct ParserDirectiveTypes
 {
   enum class SourceAssetRequired {
     Yes,
@@ -91,7 +96,7 @@ struct CompileDirectiveTypes
 };
 
 //-----------------------------------------------------------------------------
-struct CompilerOtherTypes
+struct ParserOtherTypes
 {
   struct SourceAsset {
     TokenPtr token_;
@@ -99,7 +104,7 @@ struct CompilerOtherTypes
     String filePath_;
     String fullFilePath_;
     String renameFilePath_;
-    CompileDirectiveTypes::SourceAssetRequired required_{};
+    ParserDirectiveTypes::SourceAssetRequired required_{};
     bool generated_{};
     bool commandLine_{};
   };
@@ -108,7 +113,9 @@ struct CompilerOtherTypes
 
   struct Context
   {
+    Parser* parser_{};
     Tokenizer* tokenizer_{};
+    CompileStatePtr singleLineState_;
 
     Tokenizer& operator*() noexcept { return *tokenizer_; }
     const Tokenizer& operator*() const noexcept { return *tokenizer_; }
@@ -119,9 +126,9 @@ struct CompilerOtherTypes
 };
 
 //-----------------------------------------------------------------------------
-struct Compiler : public CompilerTypes,
-                  public CompileDirectiveTypes,
-                  public CompilerOtherTypes
+struct Parser : public ParserTypes,
+                public ParserDirectiveTypes,
+                public ParserOtherTypes
 {
   Config config_;
   Callbacks callbacks_;
@@ -137,31 +144,34 @@ struct Compiler : public CompilerTypes,
 
   SourceList sources_;
   SourceList processedSources_;
+  std::set<Path> alreadyIncludedSources_;
 
-  Compiler(
+  Parser(
     const Config& config,
     Callbacks* callbacks = nullptr) noexcept;
 
-  Compiler() noexcept = delete;
-  Compiler(const Compiler&) noexcept = delete;
-  Compiler(Compiler&&) noexcept = delete;
+  Parser() noexcept = delete;
+  Parser(const Parser&) noexcept = delete;
+  Parser(Parser&&) noexcept = delete;
 
-  Compiler& operator=(const Compiler&) noexcept = delete;
-  Compiler& operator=(Compiler&&) noexcept = delete;
+  Parser& operator=(const Parser&) noexcept = delete;
+  Parser& operator=(Parser&&) noexcept = delete;
 
-  void compile() noexcept;
+  void parse() noexcept;
   void process(Context& context) noexcept;
+  void processAssets() noexcept;
 
-  [[nodiscard]] bool consumeLineCompilerDirective(Context& context) noexcept;
+  [[nodiscard]] bool consumeLineParserDirective(Context& context) noexcept;
   bool consumeAssetOrSourceDirective(Context& context, bool isSource) noexcept;
 
-  [[nodiscard]] Tokenizer::iterator extractDirectiveEqualsQuoteOrResolveLater(
+  [[nodiscard]] std::pair<Tokenizer::iterator, bool> extractDirectiveEqualsQuoteOrResolveLater(
     Tokenizer::iterator iter,
     String& output,
+    TokenPtr& outStringToken,
     TokenizerPtr& outUnresolved,
     bool warnIfNotFound = true) noexcept;
 
-  [[nodiscard]] Tokenizer::iterator extractDirectiveEqualsLiteral(
+  [[nodiscard]] std::pair<Tokenizer::iterator, bool> extractDirectiveEqualsLiteral(
     Tokenizer::iterator iter,
     String& output,
     bool warnIfNotFound = true) noexcept;
@@ -174,25 +184,29 @@ struct Compiler : public CompilerTypes,
   [[nodiscard]] bool consumeSeparator(Context& context, bool forcedOkay) noexcept;
   [[nodiscard]] bool consumeSeparators(Context& context, bool forcedOkay) noexcept;
 
-  Tokenizer::iterator consumeTo(Tokenizer::iterator  iter) noexcept;
+  [[nodiscard]] Tokenizer::iterator consumeTo(Tokenizer::iterator  iter) noexcept;
   [[nodiscard]] Tokenizer::iterator consumeAfter(Tokenizer::iterator  iter) noexcept;
 
-  TokenPtr validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) noexcept;
-  TokenPtr validOrLastValid(Tokenizer::iterator iter, const TokenPtr& token) noexcept { return validOrLastValid(iter.list(), token); }
+  [[nodiscard]] static TokenPtr pickValid(const TokenPtr& tokenPreferred, const TokenPtr& tokenBackup) noexcept { return tokenPreferred ? tokenPreferred : tokenBackup; }
+  [[nodiscard]] TokenPtr validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) noexcept;
+  [[nodiscard]] TokenPtr validOrLastValid(Tokenizer::iterator iter, const TokenPtr& token) noexcept { return validOrLastValid(iter.list(), token); }
+  [[nodiscard]] CompileStatePtr pickState(Context& context, TokenPtr token) noexcept;
 
-  TokenizerPtr extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept;
+  [[nodiscard]] TokenizerPtr extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept;
+  
+  [[nodiscard]] QuoteResult parseQuote(Tokenizer::iterator iter) noexcept;
 
   void handleAsset(Context& context, SourceAssetDirective&) noexcept;
   void handleSource(Context& context, SourceAssetDirective&) noexcept;
 
-  static bool isOperator(const TokenConstPtr& token, Operator oper) noexcept;
-  static bool isLiteral(const TokenConstPtr& token) noexcept;
-  static bool isSeparator(const TokenConstPtr& token) noexcept;
-  static bool isQuote(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isOperator(const TokenConstPtr& token, Operator oper) noexcept;
+  [[nodiscard]] static bool isLiteral(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isSeparator(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isQuote(const TokenConstPtr& token) noexcept;
 
-  static bool isCommaOrCloseDirective(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isCommaOrCloseDirective(const TokenConstPtr& token) noexcept;
 
-  static std::function<bool(const TokenConstPtr& token)> isOperatorFunc(Operator oper) noexcept;
+  [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isOperatorFunc(Operator oper) noexcept;
 
 protected:
   void prime() noexcept;
@@ -202,7 +216,7 @@ protected:
   void out(Error error, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
   void out(Warning warning, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
   void out(Informational info, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
-  bool shouldAbort() noexcept;
+  [[nodiscard]] bool shouldAbort() noexcept;
 };
 
 } // namespace zax

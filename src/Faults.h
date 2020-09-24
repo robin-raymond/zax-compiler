@@ -24,6 +24,11 @@ struct Faults
   StateArray current_;
   std::stack<StateArray> stack_;
 
+  Faults fork() const noexcept {
+    Faults result{ .current_ = current_ };
+    return result;
+  }
+
   void push() noexcept
   {
     stack_.push(current_);

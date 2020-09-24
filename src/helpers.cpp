@@ -27,12 +27,11 @@ std::pair<std::unique_ptr<std::byte[]>, size_t> zax::readBinaryFile(const String
   std::ifstream binFile;
   std::uintmax_t size{};
 
-  try {
-    size = std::filesystem::file_size(fileName);
-  }
-  catch (const std::filesystem::filesystem_error&) {
+  std::error_code ec;
+
+  size = std::filesystem::file_size(fileName, ec);
+  if (ec)
     return {};
-  }
 
   binFile.open(fileName, std::ifstream::in | std::ifstream::binary);
   if (!binFile.is_open())
@@ -95,7 +94,7 @@ String zax::makeIncludeFile(
   std::replace(newFile.begin(), newFile.end(), '/', '\\');
 #endif //_WIN32
 
-  std::filesystem::path newFilePath{ newFile };
+  Path newFilePath{ newFile };
   if (newFilePath.has_root_path()) {
     outFullFilePath = std::filesystem::absolute(newFilePath, ec).string();
     if (ec)
@@ -134,7 +133,7 @@ String zax::fileAndPathFromFilePath(
   const StringView filePath,
   String& outParentFilePath) noexcept
 {
-  std::filesystem::path path{ filePath };
+  Path path{ filePath };
 
   outParentFilePath = path.parent_path().string();
   return path.filename().string();
@@ -149,8 +148,8 @@ String zax::locateFile(
 {
   outFullFilePath = {};
   std::error_code ec{};
-  std::filesystem::path currentFilePath{ currentFile };
-  std::filesystem::path parentCurrentFile{ currentFilePath.parent_path() };
+  Path currentFilePath{ currentFile };
+  Path parentCurrentFile{ currentFilePath.parent_path() };
   if (useAbsolutePath) {
     parentCurrentFile = std::filesystem::absolute(parentCurrentFile, ec);
     if (ec)
@@ -161,7 +160,7 @@ String zax::locateFile(
     String fullPath;
     auto usePath{ parentCurrentFile / currentFilePath.filename() };
     auto result{ makeIncludeFile(usePath.string(), newFile, fullPath) };
-    if (std::filesystem::is_regular_file(std::filesystem::path{ result }, ec)) {
+    if (std::filesystem::is_regular_file(Path{ result }, ec)) {
       outFullFilePath = fullPath;
       return result;
     }
@@ -183,7 +182,6 @@ void zax::locateWildCardFiles(
   const StringView newFileWithWildCards,
   bool useAbsolutePath) noexcept
 {
-  using Path = std::filesystem::path;
   using PathList = std::list<Path>;
   using ResultList = std::list<LocateWildCardFilesResult>;
 
@@ -197,7 +195,8 @@ void zax::locateWildCardFiles(
   if (!HasWild::hasWild(newFileWithWildCards)) {
     String outFullFilePath;
     String result{ locateFile(currentFile, newFileWithWildCards, outFullFilePath) };
-    outFoundFilePaths.emplace_back(result, outFullFilePath, StringList{});
+    if (!result.empty())
+      outFoundFilePaths.emplace_back(result, outFullFilePath, StringList{});
     return;
   }
 

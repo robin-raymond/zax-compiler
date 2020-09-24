@@ -122,7 +122,7 @@ struct WarningTypes
         {Warning::DeprecateDirective, "deprecate-directive"},
         {Warning::DirectiveNotUnderstood, "directive-not-understood"},
         {Warning::SourceNotFound, "a source file ($file$) was requested to be parsed but it cannot be located"},
-        {Warning::AssetNotFound, "asset-not-found"},
+        {Warning::AssetNotFound, "an asset file ($file$) was requested to be copied but it cannot be located"},
         {Warning::Shadowing, "shadowing"},
         {Warning::UninitializedData, "uninitialized-data"},
         {Warning::LifetimeLinkageToUnrelatedPointer, "lifetime-linkage-to-unrelated-pointer"},
