@@ -27,11 +27,7 @@ using namespace std::string_view_literals;
 namespace zaxTest
 {
 
-//---------------------------------------------------------------------------
-//---------------------------------------------------------------------------
-//---------------------------------------------------------------------------
-//---------------------------------------------------------------------------
-struct ParserBasics
+struct ParserCommon
 {
   struct ExpectedFailures
   {
@@ -170,37 +166,48 @@ struct ParserBasics
   }
 
   //-------------------------------------------------------------------------
-  void test() noexcept(false)
+  void testCommon(
+    const std::string_view filePath,
+    const std::string_view content) noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/a.zax" };
-
     std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
+    std::filesystem::create_directories(std::filesystem::path{ filePath }.parent_path(), ec);
 
-    const std::string_view content{
-      "\n"
-      "\\;\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
+    TEST(zax::writeBinaryFile(filePath, content));
 
     Config config;
-    config.inputFilePaths_.emplace_back(example);
+    config.inputFilePaths_.emplace_back(filePath);
     auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::WarningTypes::Warning::NewlineAfterContinuation, example, 2, 2);
-    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 2);
 
     parser->parse();
 
     output(__FILE__ "::" __FUNCTION__);
   }
+};
+
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct ParserSourceAssetDirectives : public ParserCommon
+{
+  //-------------------------------------------------------------------------
+  void test() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/a.zax" };
+    expect(zax::WarningTypes::Warning::NewlineAfterContinuation, example, 2, 2);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 2);
+
+    testCommon(example,
+      "\n"
+      "\\;\n");
+  }
 
   //-------------------------------------------------------------------------
   void testDirectiveInclude() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/b.zax" };
-    const std::string_view example2{ "ignored/testing/parser/c.zax" };
+    const std::string_view example1{ "ignored/testing/parser/sources/b.zax" };
+    const std::string_view example2{ "ignored/testing/parser/sources/c.zax" };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
@@ -235,8 +242,8 @@ struct ParserBasics
   //-------------------------------------------------------------------------
   void testDirectiveInclude2() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/d.zax" };
-    const std::string_view example2{ "ignored/testing/parser/e.zax" };
+    const std::string_view example1{ "ignored/testing/parser/sources/d.zax" };
+    const std::string_view example2{ "ignored/testing/parser/sources/e.zax" };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
@@ -269,95 +276,48 @@ struct ParserBasics
   //-------------------------------------------------------------------------
   void testDirectiveOdd() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/f.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/f.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[ < foobar ]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 4);
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 4);
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 22 - 8 + 1);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[ < foobar ]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveSourceBadAfterComma() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/g.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/g.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source='bogus.zax', required=warn, < ]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 45 - 8 + 1);
-    expect(zax::WarningTypes::Warning::SourceNotFound, example, 2, 17 - 8 + 1, StringMap{ {"$file$", "bogus.zax"} });
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 45 - 8 + 1);
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 49 - 8 + 1);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', required=warn, < ]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveSourceRepeated() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/h.zax" };
-
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source='bog''us.zax', required=warn, required=yes, generated=no, generated=yes, rename=\"foo.zax\"\\\n"
-      ", unknown='' ]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
+    const std::string_view example{ "ignored/testing/parser/sources/h.zax" };
 
     expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 47 - 8 + 1);
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 75 - 8 + 1);
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 90 - 8 + 1);
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 3, 10 - 8 + 1);
-    expect(zax::WarningTypes::Warning::SourceNotFound, example, 2, 17 - 8 + 1, StringMap{ { "$file$", "bogus.zax" } });
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 23 - 8 + 1);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source='bog''us.zax', required=warn, required=yes, generated=no, generated=yes, rename=\"foo.zax\"\\\n"
+      ", unknown='' ]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveAssetRepeated() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/i.zax" };
-    const std::string_view example2{ "ignored/testing/parser/asset.txt" };
+    const std::string_view example1{ "ignored/testing/parser/sources/i.zax" };
+    const std::string_view example2{ "ignored/testing/parser/sources/asset.txt" };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
@@ -377,15 +337,11 @@ struct ParserBasics
     auto parser{ std::make_shared<Parser>(config, callbacks()) };
 
     expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example1, 2, 46 - 8 + 1);
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example1, 2, 74 - 8 + 1);
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example1, 3, 10 - 8 + 1);
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example1, 3, 23 - 8 + 1);
 
     parser->parse();
 
-    ec = {};
-    TEST(std::filesystem::is_regular_file(Path{ "ignored/output/asset.txt" }, ec));
-    TEST(!ec);
+    TEST(!std::filesystem::is_regular_file(Path{ "ignored/output/asset.txt" }, ec));
 
     output(__FILE__ "::" __FUNCTION__);
   }
@@ -393,8 +349,8 @@ struct ParserBasics
   //-------------------------------------------------------------------------
   void testDirectiveAssetNotFound() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/j.zax" };
-    const std::string_view example2{ "ignored/testing/parser/asset.txt" };
+    const std::string_view example1{ "ignored/testing/parser/sources/j.zax" };
+    const std::string_view example2{ "ignored/testing/parser/sources/asset.txt" };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
@@ -413,7 +369,7 @@ struct ParserBasics
     config.inputFilePaths_.emplace_back(example1);
     auto parser{ std::make_shared<Parser>(config, callbacks()) };
 
-    expect(zax::ErrorTypes::Error::AssetNotFound, example1, 2, 16 - 8 + 1, StringMap{ { "$file$", "bogus_asset.txt" } });
+    expect(zax::ErrorTypes::Error::AssetNotFound, example1, 2, 3, StringMap{ { "$file$", "bogus_asset.txt" } });
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example1, 3, 3);
 
     parser->parse();
@@ -424,7 +380,7 @@ struct ParserBasics
   //-------------------------------------------------------------------------
   void testDirectiveAssetPattern() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/k.zax" };
+    const std::string_view example1{ "ignored/testing/parser/sources/k.zax" };
     const std::string_view example2{ "ignored/testing/beebop/apple_fruit.txt" };
     const std::string_view example3{ "ignored/testing/beebop/banana_fruit.txt" };
     const std::string_view example4{ "ignored/testing/beecop/apple_fruit.txt" };
@@ -479,11 +435,69 @@ struct ParserBasics
   }
 
   //-------------------------------------------------------------------------
+  void testDirectiveAssetPattern2() noexcept(false)
+  {
+    const std::string_view example1{ "ignored/testing/parser/sources/k.zax" };
+    const std::string_view example2{ "ignored/testing/deebop/apple_fruit.txt" };
+    const std::string_view example3{ "ignored/testing/deebop/banana_fruit.txt" };
+    const std::string_view example4{ "ignored/testing/deecop/apple_fruit.txt" };
+    const std::string_view example5{ "ignored/testing/deecop/banana_fruit.txt" };
+    const std::string_view example6{ "ignored/testing/deecop/caraway_seed.txt" };
+
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
+    std::filesystem::create_directories(std::filesystem::path{ example2 }.parent_path(), ec);
+    std::filesystem::create_directories(std::filesystem::path{ example3 }.parent_path(), ec);
+    std::filesystem::create_directories(std::filesystem::path{ example4 }.parent_path(), ec);
+    std::filesystem::create_directories(std::filesystem::path{ example5 }.parent_path(), ec);
+    std::filesystem::create_directories(std::filesystem::path{ example6 }.parent_path(), ec);
+
+    const std::string_view content1{
+      "\n"
+      "[[asset='bee?op/*_fruit.txt', required=yes, rename=\"ignored/output/d?op/many_food.txt\"\\\n"
+      "]]; // ignore this\n"
+    };
+    const std::string_view content2{ "HELLO2" };
+    const std::string_view content3{ "HELLO3" };
+    const std::string_view content4{ "HELLO4" };
+    const std::string_view content5{ "HELLO5" };
+    const std::string_view content6{ "HELLO6" };
+
+    TEST(zax::writeBinaryFile(example1, content1));
+    TEST(zax::writeBinaryFile(example2, content2));
+    TEST(zax::writeBinaryFile(example3, content3));
+    TEST(zax::writeBinaryFile(example4, content4));
+    TEST(zax::writeBinaryFile(example5, content5));
+    TEST(zax::writeBinaryFile(example6, content6));
+
+    Config config;
+    config.inputFilePaths_.emplace_back(example1);
+    auto parser{ std::make_shared<Parser>(config, callbacks()) };
+
+    expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dbop/many_food.txt" } });
+    expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dbop/many_food.txt" } });
+    expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dcop/many_food.txt" } });
+    expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dcop/many_food.txt" } });
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example1, 3, 3);
+
+    parser->parse();
+
+    auto checkNotExists{ [&](StringView fileName) noexcept(false) {
+      std::error_code ec{};
+      TEST(!std::filesystem::is_regular_file(Path{ fileName }, ec));
+    } };
+    checkNotExists("ignored/output/dbop/many_food.txt");
+    checkNotExists("ignored/output/dcop/many_food.txt");
+
+    output(__FILE__ "::" __FUNCTION__);
+  }
+
+  //-------------------------------------------------------------------------
   void testDirectiveAssetIllegalOutName() noexcept(false)
   {
     auto check{[&](const String& letter, const String& prefix) {
-      const String example1{ "ignored/testing/parser/"s + letter  +".zax" };
-      const String example2{ "ignored/testing/parser/"s + letter + "-asset.txt" };
+      const String example1{ "ignored/testing/parser/sources/"s + letter  +".zax" };
+      const String example2{ "ignored/testing/parser/sources/"s + letter + "-asset.txt" };
 
       std::error_code ec;
       std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
@@ -502,7 +516,7 @@ struct ParserBasics
       config.inputFilePaths_.emplace_back(example1);
       auto parser{ std::make_shared<Parser>(config, callbacks()) };
 
-      expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 16 - 8 + 1, StringMap{ {"$file$", prefix + "ignored/output/" + letter + "-asset.txt" } });
+      expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 3, StringMap{ {"$file$", prefix + "ignored/output/" + letter + "-asset.txt" } });
       expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example1, 3, 3);
 
       parser->parse();
@@ -520,8 +534,8 @@ struct ParserBasics
   //-------------------------------------------------------------------------
   void testDirectiveAssetIllegalOutName2() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/n.zax"sv };
-    const std::string_view example2{ "ignored/testing/parser/n-asset.txt"sv };
+    const std::string_view example1{ "ignored/testing/parser/sources/n.zax"sv };
+    const std::string_view example2{ "ignored/testing/parser/sources/n-asset.txt"sv };
 
     auto illegalChars{ "*\0"s };
 
@@ -540,7 +554,7 @@ struct ParserBasics
     config.inputFilePaths_.emplace_back(example1);
     auto parser{ std::make_shared<Parser>(config, callbacks()) };
 
-    expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 16 - 8 + 1, StringMap{ {"$file$"s, "ignored/output/n"s + illegalChars + "asset.txt"s} });
+    expect(zax::ErrorTypes::Error::OutputFailure, example1, 2, 3, StringMap{ {"$file$"s, "ignored/output/n"s + illegalChars + "asset.txt"s} });
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example1, 3, 3);
 
     parser->parse();
@@ -552,65 +566,79 @@ struct ParserBasics
   }
 
   //-------------------------------------------------------------------------
+  void testDirectiveAssetIllegalQuote() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/o1.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 43 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[asset='bogus.zax', required=yes, foo='hi']]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveAssetIllegalQuote2() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/o2.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[asset='bogus.zax', asset=? ?]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveAssetIllegalQuote3() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/o3.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[asset='bogus.zax', foo=? ?]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
   void testDirectiveSourceMissingError() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/o.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/o4.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source='bogus.zax', required=yes\\\n"
-      "]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::ErrorTypes::Error::SourceNotFound, example, 2, 17 - 8 + 1, StringMap{ { "$file$", "bogus.zax" } });
+    expect(zax::ErrorTypes::Error::SourceNotFound, example, 2, 3, StringMap{ { "$file$", "bogus.zax" } });
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 3);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', required=yes\\\n"
+      "]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveSourceMissingIgnored() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/p.zax" };
-
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source='bogus.zax', required=no\\\n"
-      "]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
+    const std::string_view example{ "ignored/testing/parser/sources/p.zax" };
 
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 3);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', required=no\\\n"
+      "]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveIncludeTwice() noexcept(false)
   {
-    const std::string_view example1{ "ignored/testing/parser/q.zax" };
-    const std::string_view example2{ "ignored/testing/parser/r.zax" };
+    const std::string_view example1{ "ignored/testing/parser/sources/q.zax" };
+    const std::string_view example2{ "ignored/testing/parser/sources/r.zax" };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path{ example1 }.parent_path(), ec);
@@ -647,114 +675,193 @@ struct ParserBasics
   //-------------------------------------------------------------------------
   void testDirectiveSourceNotUnderstood() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/s.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/s.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source!='bogus.zax'\\\n"
-      "]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 16 - 8 + 1);
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 16 - 8 + 1);
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 3);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source!='bogus.zax'\\\n"
+      "]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveSourceNotUnderstood2() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/t.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/t.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 16 - 8 + 1);
 
-    const std::string_view content{
+    testCommon(example,
       "\n"
-      "[[source="
-    };
+      "[[source=");
+  }
 
-    TEST(zax::writeBinaryFile(example, content));
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceNotUnderstood3() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/t3.zax" };
 
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 3);
 
-    expect(zax::ErrorTypes::Error::Syntax, example, 2, 16 - 8 + 1);
-    expect(zax::ErrorTypes::Error::Syntax, example, 2, 16 - 8 + 1);
-
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveSourceRequireHuh() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/u.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/u.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source='bogus.zax', required!=no\\\n"
-      "]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 38 - 8 + 1);
-    expect(zax::ErrorTypes::Error::SourceNotFound, example, 2, 17 - 8 + 1, StringMap{ {"$file$", "bogus.zax" } });
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 38 - 8 + 1);
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 3);
 
-    parser->parse();
-
-    output(__FILE__ "::" __FUNCTION__);
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', required!=no\\\n"
+      "]]; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
   void testDirectiveSourceRequireHuh2() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/parser/v.zax" };
+    const std::string_view example{ "ignored/testing/parser/sources/v.zax" };
 
-    std::error_code ec;
-    std::filesystem::create_directories(std::filesystem::path{ example }.parent_path(), ec);
-
-    const std::string_view content{
-      "\n"
-      "[[source='bogus.zax', required=?\\\n"
-      "]]; // ignore this\n"
-    };
-
-    TEST(zax::writeBinaryFile(example, content));
-
-    Config config;
-    config.inputFilePaths_.emplace_back(example);
-    auto parser{ std::make_shared<Parser>(config, callbacks()) };
-
-    expect(zax::ErrorTypes::Error::Syntax, example, 2, 39 - 8 + 1);
-    expect(zax::ErrorTypes::Error::SourceNotFound, example, 2, 17 - 8 + 1, StringMap{ {"$file$", "bogus.zax" } });
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 30 - 8 + 1);
     expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 3);
 
-    parser->parse();
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', required=?\\\n"
+      "]]; // ignore this\n");
+  }
 
-    output(__FILE__ "::" __FUNCTION__);
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceRequireHuh2a() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/va.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 30 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', required=?\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceRequireHuh2b() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/vb.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 16 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source- - ='bogus.zax',required=yes]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceLiteral() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/w.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source=yes]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceEnumFail() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/x.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax',required=foo]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceDoubleGenerated() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/x.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 43 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax',generated=yes,generated=no]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceInvalidGenerated() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/x.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax',generated=warn]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceInvalidLiteral() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/x.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax',bogus=warn]]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceEmptyValue() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/y.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='']]\n"
+      "; // ignore this\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void testDirectiveSourceDoubleSource() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/sources/z.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 30 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[source='bogus.zax', source = 'hello.zax']]\n"
+      "; // ignore this\n");
   }
 
   //-------------------------------------------------------------------------
@@ -771,15 +878,504 @@ struct ParserBasics
     runner([&]() { testDirectiveAssetRepeated(); });
     runner([&]() { testDirectiveAssetNotFound(); });
     runner([&]() { testDirectiveAssetPattern(); });
+    runner([&]() { testDirectiveAssetPattern2(); });
     runner([&]() { testDirectiveAssetIllegalOutName(); });
     runner([&]() { testDirectiveAssetIllegalOutName2(); });
+    runner([&]() { testDirectiveAssetIllegalQuote(); });
+    runner([&]() { testDirectiveAssetIllegalQuote2(); });
+    runner([&]() { testDirectiveAssetIllegalQuote3(); });
     runner([&]() { testDirectiveSourceMissingError(); });
     runner([&]() { testDirectiveSourceMissingIgnored(); });
     runner([&]() { testDirectiveIncludeTwice(); });
     runner([&]() { testDirectiveSourceNotUnderstood(); });
     runner([&]() { testDirectiveSourceNotUnderstood2(); });
+    runner([&]() { testDirectiveSourceNotUnderstood3(); });
     runner([&]() { testDirectiveSourceRequireHuh(); });
     runner([&]() { testDirectiveSourceRequireHuh2(); });
+    runner([&]() { testDirectiveSourceRequireHuh2a(); });
+    runner([&]() { testDirectiveSourceRequireHuh2b(); });
+    runner([&]() { testDirectiveSourceLiteral(); });
+    runner([&]() { testDirectiveSourceEnumFail(); });
+    runner([&]() { testDirectiveSourceDoubleGenerated(); });
+    runner([&]() { testDirectiveSourceInvalidGenerated(); });
+    runner([&]() { testDirectiveSourceInvalidLiteral(); });
+    runner([&]() { testDirectiveSourceEmptyValue(); });
+    runner([&]() { testDirectiveSourceDoubleSource(); });
+
+    reset();
+  }
+};
+
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct ParserTabStopDirective : public ParserCommon
+{
+  //-------------------------------------------------------------------------
+  void test() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/a.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop]]\n"
+      ";\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test2() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/b.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 22 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 5);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop=4]];\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test3() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/c.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop=-4]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test4() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/d.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop=.3]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test5() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/e.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 18 - 8 + 1);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop=");
+  }
+
+  //-------------------------------------------------------------------------
+  void test6() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/f.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 21 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop=4,bogus=7]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test7() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/tabstop/g.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 21 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[tab-stop=4,bogus=? ?]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void runAll() noexcept(false)
+  {
+    auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
+
+    runner([&]() { test(); });
+    runner([&]() { test2(); });
+    runner([&]() { test3(); });
+    runner([&]() { test4(); });
+    runner([&]() { test5(); });
+    runner([&]() { test6(); });
+    runner([&]() { test7(); });
+
+    reset();
+  }
+};
+
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct ParserLineAssignDirective : public ParserCommon
+{
+  //-------------------------------------------------------------------------
+  void test1() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/1.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 19 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 27 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100,huh=10]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test1a() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/1a.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 32 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 46 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100,increment=10,increment=10]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test1b() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/1b.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 19 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 26 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100,huh=?]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test1c() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/1c.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 32 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 2, 47 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100,increment=10,increment=? ?]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+  //-------------------------------------------------------------------------
+  void test2() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/2.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 99, 20 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 100, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 101, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test2b() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/2b.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 98, 32 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 100, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 102, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100,increment=2]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test3() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/3.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, -4, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=-4]] \\\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test4() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/4.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=.3]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test5() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/5.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 14 - 8 + 1);
+
+    testCommon(example,
+      "\n"
+      "[[line=");
+  }
+
+  //-------------------------------------------------------------------------
+  void test6() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/6.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 20 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=4100,\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test7() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/7.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 20 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=4100,,increment=1]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test8() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/8.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 15 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test9() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/9.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 15 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=,]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test10() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/10.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 15 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test11() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/11.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void runAll() noexcept(false)
+  {
+    auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
+
+    runner([&]() { test1(); });
+    runner([&]() { test1a(); });
+    runner([&]() { test1b(); });
+    runner([&]() { test1c(); });
+    runner([&]() { test2(); });
+    runner([&]() { test2b(); });
+    runner([&]() { test3(); });
+    runner([&]() { test4(); });
+    runner([&]() { test5(); });
+    runner([&]() { test6(); });
+    runner([&]() { test7(); });
+    runner([&]() { test8(); });
+    runner([&]() { test9(); });
+    runner([&]() { test10(); });
+    runner([&]() { test11(); });
+
+    reset();
+  }
+};
+
+
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct ParserFileAssignDirective : public ParserCommon
+{
+  //-------------------------------------------------------------------------
+  void test1() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/fileassign/1.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 35 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[file='beebaddabo.source',what='foo']]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test1a() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/fileassign/1a.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 35 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[file='beebaddabo.source',what=? ?]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test2() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/fileassign/2.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, "beebaddabo.source", 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[file='beebaddabo.source']]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test3() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/fileassign/3.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, "beebaddabo.source", 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[file='beebaddabo''.source']]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test4() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/fileassign/4.zax" };
+
+    expect(zax::ErrorTypes::Error::Syntax, example, 2, 14 - 8 + 1);
+
+    testCommon(example,
+      "\n"
+      "[[file=");
+  }
+
+  //-------------------------------------------------------------------------
+  void test5() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/fileassign/5.zax" };
+
+    expect(zax::WarningTypes::Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[file='']]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void runAll() noexcept(false)
+  {
+    auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
+
+    runner([&]() { test1(); });
+    runner([&]() { test1a(); });
+    runner([&]() { test2(); });
+    runner([&]() { test3(); });
+    runner([&]() { test4(); });
+    runner([&]() { test5(); });
 
     reset();
   }
@@ -788,7 +1384,10 @@ struct ParserBasics
 //---------------------------------------------------------------------------
 void testParser() noexcept(false)
 {
-  ParserBasics{}.runAll();
+  ParserSourceAssetDirectives{}.runAll();
+  ParserTabStopDirective{}.runAll();
+  ParserLineAssignDirective{}.runAll();
+  ParserFileAssignDirective{}.runAll();
 }
 
 } // namespace zaxTest

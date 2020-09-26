@@ -110,4 +110,7 @@ String stringReplace(
   const StringView search,
   const StringView replace) noexcept;
 
+std::optional<int> toInt(const String& input) noexcept;
+std::optional<int> toInt(StringView input) noexcept;
+
 } // namespace zax

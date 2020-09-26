@@ -3,6 +3,7 @@
 #include "Tokenizer.h"
 #include "OperatorLut.h"
 #include "CompilerException.h"
+#include "CompileState.h"
 
 using namespace zax;
 using namespace std::string_view_literals;
@@ -14,7 +15,6 @@ bool TokenizerTypes::ParserPos::operator==(const ParserPos& rhs) const noexcept
     (location_ == rhs.location_) &&
     (actualLocation_ == rhs.actualLocation_) &&
     (pos_ == rhs.pos_) &&
-    (tabSize_ == rhs.tabSize_) &&
     (lineSkip_ == rhs.lineSkip_);
 }
 
@@ -37,12 +37,12 @@ Tokenizer::Tokenizer(
   actualFilePath_(filePath),
   rawContents_(std::move(rawContents)),
   raw_(rawContents_.first.get()),
-  compileState_(compileState),
+  state_(compileState),
   operatorLut_(operatorLut)
 {
   assert(filePath_);
   assert(rawContents_.first);
-  assert(compileState_);
+  assert(state_);
   assert(operatorLut_);
 
   static_assert(sizeof(std::byte) == sizeof(char));
@@ -63,7 +63,7 @@ Tokenizer::Tokenizer(
   parsedTokens_(std::move(tokenList)),
   filePath_(original.filePath_),
   actualFilePath_(original.actualFilePath_),
-  compileState_(original.compileState_),
+  state_(original.state_),
   operatorLut_(original.operatorLut_),
   errorCallback_(original.errorCallback_),
   warningCallback_(original.warningCallback_),
@@ -73,8 +73,8 @@ Tokenizer::Tokenizer(
   raw_ = reinterpret_cast<const std::byte*>(nulStr);
 
   assert(filePath_);
-  assert(rawContents_.first);
-  assert(compileState_);
+  assert(raw_);
+  assert(state_);
   assert(operatorLut_);
 
   static_assert(sizeof(std::byte) == sizeof(char));
@@ -87,7 +87,7 @@ Tokenizer::~Tokenizer() noexcept
 }
 
 //-----------------------------------------------------------------------------
-void Tokenizer::count(ParserPos& parserPos, char c) noexcept
+void Tokenizer::count(const CompileState& state, ParserPos& parserPos, char c) noexcept
 {
   if (c < 0) {
     if (parserPos.utf8Count_ > 0) {
@@ -135,7 +135,7 @@ void Tokenizer::count(ParserPos& parserPos, char c) noexcept
       break;
     }
     case '\t':  {
-      parserPos.location_.column_ += parserPos.tabSize_ - ((parserPos.location_.column_ - 1) % parserPos.tabSize_);
+      parserPos.location_.column_ += state.tabStopWidth_ - ((parserPos.location_.column_ - 1) % state.tabStopWidth_);
       parserPos.actualLocation_.column_ = parserPos.location_.column_;
       return;
     }
@@ -163,7 +163,7 @@ bool Tokenizer::consumeUtf8Bom(ParserPos& parserPos) noexcept
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& parserPos) noexcept
+optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(const CompileState& state, ParserPos& parserPos) noexcept
 {
   if (parserPos.pos_.size() < 1)
     return {};
@@ -196,7 +196,7 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
     while (pos < end) {
       if (isEol(*pos))
         break;
-      count(parserPos, *pos);
+      count(state, parserPos, *pos);
       ++pos;
     }
 
@@ -218,7 +218,7 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
     auto end = start + parserPos.pos_.length();
     auto preFinal = end;
 
-    advance(parserPos, slashStarStar);
+    advance(state, parserPos, slashStarStar);
     int nestCount{ 1 };
 
     while (pos < end) {
@@ -226,7 +226,7 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
       auto ahead{ view.substr(0, slashStarStar.length()) };
       if (ahead == slashStarStar) {
         ++nestCount;
-        advance(parserPos, slashStarStar);
+        advance(state, parserPos, slashStarStar);
         pos += slashStarStar.length();
         continue;
       }
@@ -234,15 +234,15 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
         --nestCount;
         if (0 == nestCount) {
           preFinal = pos;
-          advance(parserPos, starStarSlash);
+          advance(state, parserPos, starStarSlash);
           pos += starStarSlash.length();
           break;
         }
-        advance(parserPos, starStarSlash);
+        advance(state, parserPos, starStarSlash);
         pos += starStarSlash.length();
         continue;
       }
-      count(parserPos, *pos);
+      count(state, parserPos, *pos);
       ++pos;
     }
 
@@ -265,18 +265,18 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
     auto preFinal = end;
     bool foundEnding = false;
 
-    advance(parserPos, slashStar);
+    advance(state, parserPos, slashStar);
     while (pos < end) {
       StringView view{ pos, SafeInt<size_t>(end - pos) };
       auto ahead{ view.substr(0, starSlash.length()) };
       if (ahead == starSlash) {
         preFinal = pos;
-        advance(parserPos, slashStar);
+        advance(state, parserPos, slashStar);
         pos += starSlash.length();
         foundEnding = true;
         break;
       }
-      count(parserPos, *pos);
+      count(state, parserPos, *pos);
       ++pos;
     }
 
@@ -293,7 +293,7 @@ optional<TokenizerTypes::CommentToken> Tokenizer::consumeComment(ParserPos& pars
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenizerTypes::WhitespaceToken> Tokenizer::consumeWhitespace(ParserPos& parserPos) noexcept
+optional<TokenizerTypes::WhitespaceToken> Tokenizer::consumeWhitespace(const CompileState& state, ParserPos& parserPos) noexcept
 {
   if (parserPos.pos_.size() < 1)
     return {};
@@ -328,7 +328,7 @@ optional<TokenizerTypes::WhitespaceToken> Tokenizer::consumeWhitespace(ParserPos
         firstNewLine = pos;
     }
 
-    count(parserPos, *pos);
+    count(state, parserPos, *pos);
     ++pos;
   }
 
@@ -345,7 +345,7 @@ optional<TokenizerTypes::WhitespaceToken> Tokenizer::consumeWhitespace(ParserPos
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenizerTypes::QuoteToken> Tokenizer::consumeQuote(ParserPos& parserPos) noexcept
+optional<TokenizerTypes::QuoteToken> Tokenizer::consumeQuote(const CompileState& state, ParserPos& parserPos) noexcept
 {
   if (parserPos.pos_.size() < 1)
     return {};
@@ -354,7 +354,7 @@ optional<TokenizerTypes::QuoteToken> Tokenizer::consumeQuote(ParserPos& parserPo
   if ((c != '\'') && (c != '\"'))
     return {};
 
-  count(parserPos, c);
+  count(state, parserPos, c);
 
   QuoteToken result;
   const char* start{ parserPos.pos_.data() };
@@ -366,7 +366,7 @@ optional<TokenizerTypes::QuoteToken> Tokenizer::consumeQuote(ParserPos& parserPo
   while (pos < end) {
     if (*pos == c) {
       preFinal = pos;
-      count(parserPos, *pos);
+      count(state, parserPos, *pos);
       ++pos;
       break;
     }
@@ -376,7 +376,7 @@ optional<TokenizerTypes::QuoteToken> Tokenizer::consumeQuote(ParserPos& parserPo
         ('\v' == *pos))
       break;
 
-    count(parserPos, *pos);
+    count(state, parserPos, *pos);
     ++pos;
   }
 
@@ -388,7 +388,7 @@ optional<TokenizerTypes::QuoteToken> Tokenizer::consumeQuote(ParserPos& parserPo
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenizerTypes::LiteralToken> Tokenizer::consumeLiteral(ParserPos& parserPos) noexcept
+optional<TokenizerTypes::LiteralToken> Tokenizer::consumeLiteral(const CompileState& state, ParserPos& parserPos) noexcept
 {
   if (parserPos.pos_.size() < 1)
     return {};
@@ -415,7 +415,7 @@ optional<TokenizerTypes::LiteralToken> Tokenizer::consumeLiteral(ParserPos& pars
   if (!isFirstLiteral(c))
     return {};
 
-  count(parserPos, c);
+  count(state, parserPos, c);
 
   LiteralToken result;
   const char* start{ parserPos.pos_.data() };
@@ -426,7 +426,7 @@ optional<TokenizerTypes::LiteralToken> Tokenizer::consumeLiteral(ParserPos& pars
   while (pos < end) {
     if (!isLiteral(*pos))
       break;
-    count(parserPos, *pos);
+    count(state, parserPos, *pos);
     ++pos;
   }
 
@@ -436,7 +436,7 @@ optional<TokenizerTypes::LiteralToken> Tokenizer::consumeLiteral(ParserPos& pars
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenizerTypes::NumericToken> Tokenizer::consumeNumeric(ParserPos& parserPos) noexcept
+optional<TokenizerTypes::NumericToken> Tokenizer::consumeNumeric(const CompileState& state, ParserPos& parserPos) noexcept
 {
   if (parserPos.pos_.size() < 1)
     return {};
@@ -481,7 +481,7 @@ optional<TokenizerTypes::NumericToken> Tokenizer::consumeNumeric(ParserPos& pars
         }
         foundDot = true;
         lastWasLegal = true;
-        count(parserPos, *pos);
+        count(state, parserPos, *pos);
         ++pos;
         continue;
       }
@@ -493,7 +493,7 @@ optional<TokenizerTypes::NumericToken> Tokenizer::consumeNumeric(ParserPos& pars
         foundE = true;
         lastWasE = true;
         lastWasLegal = false;
-        count(parserPos, *pos);
+        count(state, parserPos, *pos);
         ++pos;
         continue;
       }
@@ -505,7 +505,7 @@ optional<TokenizerTypes::NumericToken> Tokenizer::consumeNumeric(ParserPos& pars
         foundSign = true;
         lastWasLegal = false;
         lastWasE = false;
-        count(parserPos, *pos);
+        count(state, parserPos, *pos);
         ++pos;
         continue;
       }
@@ -514,7 +514,7 @@ optional<TokenizerTypes::NumericToken> Tokenizer::consumeNumeric(ParserPos& pars
 
     lastWasE = false;
     lastWasLegal = true;
-    count(parserPos, *pos);
+    count(state, parserPos, *pos);
     ++pos;
   }
   if (!lastWasLegal)
@@ -545,7 +545,7 @@ optional<TokenizerTypes::OperatorToken> Tokenizer::consumeOperator(const Operato
 }
 
 //-----------------------------------------------------------------------------
-optional<TokenizerTypes::IllegalToken> Tokenizer::consumeKnownIllegalToken(ParserPos& parserPos) noexcept
+optional<TokenizerTypes::IllegalToken> Tokenizer::consumeKnownIllegalToken(const CompileState& state, ParserPos& parserPos) noexcept
 {
   if (parserPos.pos_.size() < 1)
     return {};
@@ -560,7 +560,7 @@ optional<TokenizerTypes::IllegalToken> Tokenizer::consumeKnownIllegalToken(Parse
   while (pos < end) {
     if (c != *pos)
       break;
-    count(parserPos, *pos);
+    count(state, parserPos, *pos);
     ++pos;
   }
 
@@ -600,7 +600,7 @@ void Tokenizer::primeNext() noexcept
     token->origin_.location_ = oldPos.location_;
     token->actualOrigin_.filePath_ = actualFilePath_;
     token->actualOrigin_.location_ = oldPos.actualLocation_;
-    token->compileState_ = compileState_;
+    token->compileState_ = state_;
     return token;
   } };
 
@@ -608,7 +608,7 @@ void Tokenizer::primeNext() noexcept
     bool skipWhitespace,
     bool& outDidConsumeWhitespace,
     bool& outContainedNewline) noexcept -> bool {
-    auto value{ consumeWhitespace(parserPos_) };
+    auto value{ consumeWhitespace(*state_, parserPos_) };
     if (!value)
       return false;
 
@@ -632,7 +632,7 @@ void Tokenizer::primeNext() noexcept
     bool allowedToInsertNewLine,
     bool& outDidConsumeComment,
     bool& outContainedNewline) noexcept -> bool {
-    auto value{ consumeComment(parserPos_) };
+    auto value{ consumeComment(*state_, parserPos_) };
     if (!value)
       return false;
 
@@ -664,7 +664,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto quote{ [&]() noexcept -> bool {
-    auto value{ consumeQuote(parserPos_) };
+    auto value{ consumeQuote(*state_, parserPos_) };
     if (!value)
       return false;
 
@@ -681,7 +681,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto literal{ [&]() noexcept -> bool {
-    auto value{ consumeLiteral(parserPos_) };
+    auto value{ consumeLiteral(*state_, parserPos_) };
     if (!value)
       return false;
 
@@ -694,7 +694,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto numeric{ [&]() noexcept -> bool {
-    auto value{ consumeNumeric(parserPos_) };
+    auto value{ consumeNumeric(*state_, parserPos_) };
     if (!value)
       return false;
 
@@ -735,7 +735,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto illegal{ [&]() noexcept -> bool {
-    auto value{ consumeKnownIllegalToken(parserPos_) };
+    auto value{ consumeKnownIllegalToken(*state_, parserPos_) };
     if (!value)
       return true;
 
@@ -1065,7 +1065,7 @@ void Tokenizer::clear() noexcept
   auto pos{ start };
 
   while (pos < end) {
-    count(parserPos_, *pos);
+    count(*state_, parserPos_, *pos);
     ++pos;
   }
 

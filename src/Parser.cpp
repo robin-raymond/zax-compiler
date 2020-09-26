@@ -19,6 +19,7 @@ Parser::Parser(
   operatorLut_{ std::make_shared<OperatorLut>() },
   activeState_{ std::make_shared<CompileState>() }
 {
+  activeState_->tabStopWidth_ = config_.tabStopWidth_;
   if (!callbacks) {
     callbacks_.fatal_ = [](Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept {
       zax::fatal(error, token, mapping);
@@ -219,7 +220,7 @@ Tokenizer::iterator Parser::consumeAfter(Tokenizer::iterator  iter) noexcept
 }
 
 //-----------------------------------------------------------------------------
-TokenPtr Parser::validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) noexcept
+TokenConstPtr Parser::validOrLastValid(const TokenConstPtr& token, Tokenizer& tokenizer) const noexcept
 {
   if (token)
     return token;
@@ -230,7 +231,7 @@ TokenPtr Parser::validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) n
 }
 
 //-----------------------------------------------------------------------------
-CompileStatePtr Parser::pickState(Context& context, TokenPtr token) noexcept
+CompileStatePtr Parser::pickState(Context& context, TokenConstPtr token) noexcept
 {
   if (context.singleLineState_)
     return context.singleLineState_;
@@ -246,31 +247,55 @@ TokenizerPtr Parser::extract(Tokenizer::iterator first, Tokenizer::iterator last
 }
 
 //-----------------------------------------------------------------------------
-ParserTypes::QuoteResult Parser::parseQuote(Tokenizer::iterator iter) noexcept
+std::optional<ParserTypes::QuoteResult> Parser::parseQuote(Tokenizer::iterator iter) noexcept
 {
-  QuoteResult result;
-  result.iter_ = iter;
   if (iter.isEnd())
-    return result;
+    return {};
+  if (!isQuote(*iter))
+    return {};
 
-  auto token{ *iter };
-  if (!token)
-    return result;
+  QuoteResult result;
+  result.quoteIter_ = iter;
+  result.quote_ = (*iter)->token_;
+  ++iter;
 
-  if (!isQuote(token))
-    return result;
-
-  result.token_ = token;
-  result.quote_ = token->token_;
-  ++result.iter_;
-
-  while (!result.iter_.isEnd()) {
-    token = *result.iter_;
-    if (!isQuote(token))
+  while (!iter.isEnd()) {
+    if (!isQuote(*iter))
       break;
-    result.quote_ += token->token_;
-    ++result.iter_;
+    result.quote_ += (*iter)->token_;
+    ++iter;
   }
+
+  result.afterIter_ = iter;
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+std::optional<ParserTypes::NumberResult> Parser::parseSimpleNumber(Tokenizer::iterator iter) noexcept
+{
+  if (iter.isEnd())
+    return {};
+
+  const OperatorLut& lut{ *iter.list().operatorLut_ };
+
+  String prefix;
+  if (isOperatorOrAlternative(lut, *iter, Operator::PlusPreUnary))
+    prefix = "+"sv;
+  if (isOperatorOrAlternative(lut, *iter, Operator::MinusPreUnary))
+    prefix = "-"sv;
+
+  if (!prefix.empty())
+    ++iter;
+
+  if (!isNumber(*iter))
+    return {};
+
+  NumberResult result;
+  result.numberIter_ = iter;
+  result.number_ = prefix + String{ (*iter)->token_ };
+
+  ++iter;
+  result.afterIter_ = iter;
   return result;
 }
 
@@ -285,11 +310,47 @@ bool Parser::isOperator(const TokenConstPtr& token, Operator oper) noexcept
 }
 
 //-----------------------------------------------------------------------------
+bool Parser::isOperatorOrAlternative(const TokenConstPtr& token, Operator oper) noexcept
+{
+  assert(operatorLut_);
+  return isOperatorOrAlternative(*operatorLut_, token, oper);
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::isOperatorOrAlternative(const OperatorLut& lut, const TokenConstPtr& token, Operator oper) noexcept
+{
+  if (!token)
+    return false;
+  if (TokenType::Operator != token->type_)
+    return false;
+  if (oper == token->operator_)
+    return true;
+  auto& conflicts{ lut.lookupConflicts(oper) };
+  return conflicts.end() != conflicts.find(token->operator_);
+}
+
+//-----------------------------------------------------------------------------
 bool Parser::isLiteral(const TokenConstPtr& token) noexcept
 {
   if (!token)
     return false;
   return TokenType::Literal == token->type_;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::isLiteral(const TokenConstPtr& token, StringView value) noexcept
+{
+  if (!isLiteral(token))
+    return false;
+  return value == token->token_;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::isNumber(const TokenConstPtr& token) noexcept
+{
+  if (!token)
+    return false;
+  return TokenType::Number == token->type_;
 }
 
 //-----------------------------------------------------------------------------
@@ -299,7 +360,6 @@ bool Parser::isSeparator(const TokenConstPtr& token) noexcept
     return false;
   return TokenType::Separator == token->type_;
 }
-
 
 //-----------------------------------------------------------------------------
 bool Parser::isQuote(const TokenConstPtr& token) noexcept
@@ -320,9 +380,32 @@ bool Parser::isCommaOrCloseDirective(const TokenConstPtr& token) noexcept
 }
 
 //-----------------------------------------------------------------------------
+bool Parser::isUnknownExtension(const StringView name) noexcept
+{
+  constexpr static StringView prefix{ "x-" };
+  if (name.length() < prefix.length())
+    return false;
+  return prefix == name.substr(0, prefix.length());
+}
+
+//-----------------------------------------------------------------------------
 std::function<bool(const TokenConstPtr& token)> Parser::isOperatorFunc(Operator oper) noexcept
 {
   return [oper](const TokenConstPtr& token) noexcept -> bool {
+    return isOperator(token, oper);
+  };
+}
+
+//-----------------------------------------------------------------------------
+std::function<bool(const TokenConstPtr& token)> Parser::isOperatorOrAlternativeFunc(Operator oper) noexcept
+{
+  return isOperatorOrAlternativeFunc(*operatorLut_, oper);
+}
+
+//-----------------------------------------------------------------------------
+std::function<bool(const TokenConstPtr& token)> Parser::isOperatorOrAlternativeFunc(const OperatorLut& lut, Operator oper) noexcept
+{
+  return [oper, &lut](const TokenConstPtr& token) noexcept -> bool {
     if (!token)
       return false;
     if (TokenType::Operator != token->type_)
@@ -330,7 +413,6 @@ std::function<bool(const TokenConstPtr& token)> Parser::isOperatorFunc(Operator 
     return token->operator_ == oper;
   };
 }
-
 
 //-----------------------------------------------------------------------------
 void Parser::prime() noexcept

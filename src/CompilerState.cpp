@@ -18,6 +18,7 @@ CompileStatePtr CompileState::fork(const CompileStateConstPtr& original) noexcep
   result->errors_ = original->errors_.fork();
   result->warnings_ = original->warnings_.fork();
   result->panics_ = original->panics_.fork();
+  result->tabStopWidth_ = original->tabStopWidth_;
   result->variableDefault_ = original->variableDefault_;
   result->typeDefault_ = original->typeDefault_;
   result->functionDefault_ = original->functionDefault_;

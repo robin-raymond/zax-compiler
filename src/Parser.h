@@ -36,10 +36,30 @@ namespace zax
     std::function<bool()> shouldAbort_;
   };
 
+  struct DirectiveResult
+  {
+    Tokenizer::iterator openIter_;
+    Tokenizer::iterator closeIter_;
+    Tokenizer::iterator literalIter_;
+    Tokenizer::iterator afterIter_;
+    bool success_{ true };
+  };
+  struct DirectiveLiteral
+  {
+    Tokenizer::iterator literalIter_;
+    Tokenizer::iterator afterIter_;
+    String name_;
+  };
+
   struct QuoteResult {
-    TokenPtr token_;
+    Tokenizer::iterator quoteIter_;
+    Tokenizer::iterator afterIter_;
     String quote_;
-    Tokenizer::iterator iter_;
+  };
+  struct NumberResult {
+    Tokenizer::iterator numberIter_;
+    Tokenizer::iterator afterIter_;
+    String number_;
   };
 };
 
@@ -85,7 +105,7 @@ struct ParserDirectiveTypes
 
   struct SourceAssetDirective
   {
-    TokenPtr token_;
+    TokenConstPtr token_;
     String file_;
     String rename_;
     TokenizerPtr unresolvedFile_;
@@ -99,7 +119,7 @@ struct ParserDirectiveTypes
 struct ParserOtherTypes
 {
   struct SourceAsset {
-    TokenPtr token_;
+    TokenConstPtr token_;
     CompileStatePtr compileState_;
     String filePath_;
     String fullFilePath_;
@@ -161,20 +181,23 @@ struct Parser : public ParserTypes,
   void process(Context& context) noexcept;
   void processAssets() noexcept;
 
+  [[nodiscard]] std::optional<DirectiveResult> parseDirective(
+    Tokenizer::iterator iter,
+    std::function<bool(bool, Tokenizer::iterator, StringView)>&& noValueFunc,
+    std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& literalValueFunc,
+    std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& quoteValueFunc,
+    std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& numberValueFunc,
+    std::function<bool(bool, Tokenizer::iterator, StringView, TokenizerPtr)>&& extractedValueFunc) noexcept;
+  [[nodiscard]] static std::optional<DirectiveLiteral> parseDirectiveLiteral(Tokenizer::iterator iter) noexcept;
+
   [[nodiscard]] bool consumeLineParserDirective(Context& context) noexcept;
-  bool consumeAssetOrSourceDirective(Context& context, bool isSource) noexcept;
+  [[nodiscard]] bool consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator iter, bool isSource) noexcept;
+  [[nodiscard]] bool consumeTabStopDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeFileAssignDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeLineAssignDirective(Context& context, Tokenizer::iterator iter) noexcept;
 
-  [[nodiscard]] std::pair<Tokenizer::iterator, bool> extractDirectiveEqualsQuoteOrResolveLater(
-    Tokenizer::iterator iter,
-    String& output,
-    TokenPtr& outStringToken,
-    TokenizerPtr& outUnresolved,
-    bool warnIfNotFound = true) noexcept;
-
-  [[nodiscard]] std::pair<Tokenizer::iterator, bool> extractDirectiveEqualsLiteral(
-    Tokenizer::iterator iter,
-    String& output,
-    bool warnIfNotFound = true) noexcept;
+  [[nodiscard]] static std::optional<QuoteResult> parseQuote(Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] static std::optional<NumberResult> parseSimpleNumber(Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] static Tokenizer::iterator skipUntil(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept;
   [[nodiscard]] static Tokenizer::iterator skipUntil(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept;
@@ -187,26 +210,32 @@ struct Parser : public ParserTypes,
   [[nodiscard]] Tokenizer::iterator consumeTo(Tokenizer::iterator  iter) noexcept;
   [[nodiscard]] Tokenizer::iterator consumeAfter(Tokenizer::iterator  iter) noexcept;
 
-  [[nodiscard]] static TokenPtr pickValid(const TokenPtr& tokenPreferred, const TokenPtr& tokenBackup) noexcept { return tokenPreferred ? tokenPreferred : tokenBackup; }
-  [[nodiscard]] TokenPtr validOrLastValid(Tokenizer& tokenizer, const TokenPtr& token) noexcept;
-  [[nodiscard]] TokenPtr validOrLastValid(Tokenizer::iterator iter, const TokenPtr& token) noexcept { return validOrLastValid(iter.list(), token); }
-  [[nodiscard]] CompileStatePtr pickState(Context& context, TokenPtr token) noexcept;
+  [[nodiscard]] static TokenConstPtr pickValid(const TokenConstPtr& tokenPreferred, const TokenConstPtr& tokenBackup) noexcept { return tokenPreferred ? tokenPreferred : tokenBackup; }
+  [[nodiscard]] static TokenConstPtr pickValid(const TokenConstPtr& tokenPreferred, const TokenConstPtr& tokenBackup1, const TokenConstPtr& tokenBackup2) noexcept { return pickValid(pickValid(tokenPreferred, tokenBackup1), tokenBackup2); }
+  [[nodiscard]] TokenConstPtr validOrLastValid(const TokenConstPtr& token, Tokenizer& tokenizer) const noexcept;
+  [[nodiscard]] TokenConstPtr validOrLastValid(const TokenConstPtr& token, Tokenizer::iterator iter) const noexcept { return validOrLastValid(token, iter.list()); }
+  [[nodiscard]] CompileStatePtr pickState(Context& context, TokenConstPtr token) noexcept;
 
   [[nodiscard]] TokenizerPtr extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept;
-  
-  [[nodiscard]] QuoteResult parseQuote(Tokenizer::iterator iter) noexcept;
 
   void handleAsset(Context& context, SourceAssetDirective&) noexcept;
   void handleSource(Context& context, SourceAssetDirective&) noexcept;
 
   [[nodiscard]] static bool isOperator(const TokenConstPtr& token, Operator oper) noexcept;
+  [[nodiscard]] bool isOperatorOrAlternative(const TokenConstPtr& token, Operator oper) noexcept;
+  [[nodiscard]] static bool isOperatorOrAlternative(const OperatorLut& lut, const TokenConstPtr& token, Operator oper) noexcept;
   [[nodiscard]] static bool isLiteral(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isLiteral(const TokenConstPtr& token, StringView value) noexcept;
+  [[nodiscard]] static bool isNumber(const TokenConstPtr& token) noexcept;
   [[nodiscard]] static bool isSeparator(const TokenConstPtr& token) noexcept;
   [[nodiscard]] static bool isQuote(const TokenConstPtr& token) noexcept;
 
   [[nodiscard]] static bool isCommaOrCloseDirective(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isUnknownExtension(const StringView name) noexcept;
 
   [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isOperatorFunc(Operator oper) noexcept;
+  [[nodiscard]] std::function<bool(const TokenConstPtr& token)> isOperatorOrAlternativeFunc(Operator oper) noexcept;
+  [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isOperatorOrAlternativeFunc(const OperatorLut& lut, Operator oper) noexcept;
 
 protected:
   void prime() noexcept;

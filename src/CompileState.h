@@ -14,6 +14,7 @@ struct CompileState
   Errors errors_;
   Panics panics_;
   Warnings warnings_;
+  int tabStopWidth_{ 8 };
 
   struct VariableDefaults {
     bool varies_{ true };

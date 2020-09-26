@@ -23,6 +23,7 @@ namespace zaxTest
 //---------------------------------------------------------------------------
 struct TokenizerBasics
 {
+  zax::CompileState state_;
   TokenizerTypes::ParserPos pos_;
   TokenizerTypes::ParserPos oldPos_;
 
@@ -112,7 +113,7 @@ struct TokenizerBasics
   {
     {
       reset();
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -121,7 +122,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\xF0\x90\x8D\x88";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -130,7 +131,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "hello // nothing to see here";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -138,7 +139,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "// something to see here";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "// something to see here");
       TEST(result->token_ == " something to see here");
@@ -151,7 +152,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "// something to see here\r\nhello";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "// something to see here");
       TEST(result->token_ == " something to see here");
@@ -171,7 +172,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "hello /* nothing to see here */";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -179,7 +180,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to see here";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to see here");
       TEST(result->token_ == " something to see here");
@@ -192,7 +193,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to see here\r\nhello";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to see here\r\nhello");
       TEST(result->token_ == " something to see here\r\nhello");
@@ -205,7 +206,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to see here\rhello";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to see here\rhello");
       TEST(result->token_ == " something to see here\rhello");
@@ -218,7 +219,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to see here */";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to see here */");
       TEST(result->token_ == " something to see here ");
@@ -231,7 +232,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to see here */afterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to see here */");
       TEST(result->token_ == " something to see here ");
@@ -244,7 +245,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to \vsee here */afterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to \vsee here */");
       TEST(result->token_ == " something to \vsee here ");
@@ -257,7 +258,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/* something to see here */\nafterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/* something to see here */");
       TEST(result->token_ == " something to see here ");
@@ -277,7 +278,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "hello /** nothing to see here **/";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -285,7 +286,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here");
       TEST(result->token_ == " something to see here");
@@ -298,7 +299,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here */";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here */");
       TEST(result->token_ == " something to see here */");
@@ -311,7 +312,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here\r\nhello";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here\r\nhello");
       TEST(result->token_ == " something to see here\r\nhello");
@@ -324,7 +325,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see */here\r\nhello";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see */here\r\nhello");
       TEST(result->token_ == " something to see */here\r\nhello");
@@ -337,7 +338,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here\rhello";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here\rhello");
       TEST(result->token_ == " something to see here\rhello");
@@ -350,7 +351,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here **/";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here **/");
       TEST(result->token_ == " something to see here ");
@@ -363,7 +364,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something /**to see here **/";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something /**to see here **/");
       TEST(result->token_ == " something /**to see here **/");
@@ -376,7 +377,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see**/ here **/";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see**/");
       TEST(result->token_ == " something to see");
@@ -389,7 +390,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see/** here **/ with something else**/";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see/** here **/ with something else**/");
       TEST(result->token_ == " something to see/** here **/ with something else");
@@ -402,7 +403,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see/** here **/ with something else**/afterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see/** here **/ with something else**/");
       TEST(result->token_ == " something to see/** here **/ with something else");
@@ -415,7 +416,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/**\n something to see/** here **/ with something else**/afterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/**\n something to see/** here **/ with something else**/");
       TEST(result->token_ == "\n something to see/** here **/ with something else");
@@ -428,7 +429,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here **/afterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here **/");
       TEST(result->token_ == " something to see here ");
@@ -441,7 +442,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to \vsee here **/afterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to \vsee here **/");
       TEST(result->token_ == " something to \vsee here ");
@@ -454,7 +455,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "/** something to see here **/\nafterjunk";
-      auto result = Tokenizer::consumeComment(pos_);
+      auto result = Tokenizer::consumeComment(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "/** something to see here **/");
       TEST(result->token_ == " something to see here ");
@@ -473,7 +474,7 @@ struct TokenizerBasics
     {
       reset();
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -482,7 +483,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\xF0\x90\x8D\x88";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -491,7 +492,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "hello /** nothing to see here **/";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -500,7 +501,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "  hello";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "  ");
       TEST(result->token_ == "  ");
@@ -513,7 +514,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\thello";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\t");
       TEST(result->token_ == "\t");
@@ -526,7 +527,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\t\bhello";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\t\b");
       TEST(result->token_ == "\t\b");
@@ -539,7 +540,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "  \b\b\bhello";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "  \b\b\b");
       TEST(result->token_ == "  \b\b\b");
@@ -552,7 +553,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\t\vhello";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\t\v");
       TEST(result->token_ == "\v");
@@ -565,7 +566,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\n hello";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\n ");
       TEST(result->token_ == "\n");
@@ -578,7 +579,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\n\n\n\n\n\n\n\n ";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeWhitespace(pos_);
+      auto result = Tokenizer::consumeWhitespace(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\n\n\n\n\n\n\n\n ");
       TEST(result->token_ == "\n");
@@ -595,7 +596,7 @@ struct TokenizerBasics
   {
     {
       reset();
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -604,7 +605,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\xF0\x90\x8D\x88";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -613,7 +614,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "hello // nothing to see here";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -621,7 +622,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\"something to see here";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\"something to see here");
       TEST(result->token_ == "something to see here");
@@ -633,7 +634,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\'something to see here";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\'something to see here");
       TEST(result->token_ == "something to see here");
@@ -645,7 +646,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\'something to see here\n\n \vhello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\'something to see here");
       TEST(result->token_ == "something to see here");
@@ -657,7 +658,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\'something to see here\'";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\'something to see here\'");
       TEST(result->token_ == "something to see here");
@@ -669,7 +670,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\"something to see here\"";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\"something to see here\"");
       TEST(result->token_ == "something to see here");
@@ -681,7 +682,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\'something to see here\'hello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\'something to see here\'");
       TEST(result->token_ == "something to see here");
@@ -693,7 +694,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\"something to see here\"hello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\"something to see here\"");
       TEST(result->token_ == "something to see here");
@@ -705,7 +706,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\"something \'to\' see here\"hello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\"something \'to\' see here\"");
       TEST(result->token_ == "something \'to\' see here");
@@ -717,7 +718,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\'something \"to\" see here\'hello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\'something \"to\" see here\'");
       TEST(result->token_ == "something \"to\" see here");
@@ -729,7 +730,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\'something \"to\" see here\n\'hello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\'something \"to\" see here");
       TEST(result->token_ == "something \"to\" see here");
@@ -741,7 +742,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\"\nsomething \'to\' see here\"hello";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\"");
       TEST(result->token_ == "");
@@ -753,7 +754,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\"\"";
-      auto result = Tokenizer::consumeQuote(pos_);
+      auto result = Tokenizer::consumeQuote(state_, pos_);
       TEST(result.has_value());
       TEST(result->originalToken_ == "\"\"");
       TEST(result->token_ == "");
@@ -769,7 +770,7 @@ struct TokenizerBasics
   {
     {
       reset();
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -778,7 +779,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\nhello // nothing to see here";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -786,7 +787,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "something";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "something");
       expect(1, 29 - 20 + 1);
@@ -796,7 +797,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "a";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "a");
       expect(1, 21 - 20 + 1);
@@ -807,7 +808,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "1";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -815,7 +816,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "something to see here";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "something");
       expect(1, 29 - 20 + 1);
@@ -825,7 +826,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "something\n to see here";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "something");
       expect(1, 29 - 20 + 1);
@@ -835,7 +836,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "_";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "_");
       expect(1, 21 - 20 + 1);
@@ -845,7 +846,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "_1";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "_1");
       expect(1, 22 - 20 + 1);
@@ -855,7 +856,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "1_";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(!result);
       expect(1, 1);
       TEST(pos_.pos_ == "1_");
@@ -864,7 +865,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "_\xF0\x90\x8D\x88z";
-      auto result = Tokenizer::consumeLiteral(pos_);
+      auto result = Tokenizer::consumeLiteral(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "_\xF0\x90\x8D\x88z");
       expect(1, 23 - 20 + 1);
@@ -879,7 +880,7 @@ struct TokenizerBasics
   {
     {
       reset();
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -888,7 +889,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "\xF0\x90\x8D\x88";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -897,7 +898,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "hello // nothing to see here";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -905,7 +906,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5");
       TEST(!result->illegalSequence_);
@@ -916,7 +917,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.");
       TEST(!result->illegalSequence_);
@@ -927,7 +928,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.0";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.0");
       TEST(!result->illegalSequence_);
@@ -938,7 +939,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.0e";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.0e");
       TEST(result->illegalSequence_);
@@ -949,7 +950,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.0e1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.0e1");
       TEST(!result->illegalSequence_);
@@ -960,7 +961,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.0e+1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.0e+1");
       TEST(!result->illegalSequence_);
@@ -971,7 +972,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.e1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.e1");
       TEST(!result->illegalSequence_);
@@ -982,7 +983,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.e+1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.e+1");
       TEST(!result->illegalSequence_);
@@ -993,7 +994,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.e-1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.e-1");
       TEST(!result->illegalSequence_);
@@ -1004,7 +1005,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5.e+e1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5.e+");
       TEST(result->illegalSequence_);
@@ -1015,7 +1016,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "5e+.1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "5e+");
       TEST(result->illegalSequence_);
@@ -1027,7 +1028,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = ".e-1";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(!result.has_value());
       expect(1, 1);
       TEST(pos_ == oldPos_);
@@ -1037,7 +1038,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = ".";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(!result.has_value());
       expect(1, 1);
       TEST(pos_ == oldPos_);
@@ -1046,7 +1047,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = ".2e-1";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == ".2e-1");
       TEST(!result->illegalSequence_);
@@ -1057,7 +1058,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = ".2e2";
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == ".2e2");
       TEST(!result->illegalSequence_);
@@ -1069,7 +1070,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "1+2";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "1");
       TEST(!result->illegalSequence_);
@@ -1081,7 +1082,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "1e+2+2";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "1e+2");
       TEST(!result->illegalSequence_);
@@ -1093,7 +1094,7 @@ struct TokenizerBasics
       reset();
       pos_.pos_ = "1e+2\xF0\x90\x8D\x88";
       oldPos_ = pos_;
-      auto result = Tokenizer::consumeNumeric(pos_);
+      auto result = Tokenizer::consumeNumeric(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "1e+2");
       TEST(!result->illegalSequence_);
@@ -1167,7 +1168,7 @@ struct TokenizerBasics
   {
     {
       reset();
-      auto result = Tokenizer::consumeKnownIllegalToken(pos_);
+      auto result = Tokenizer::consumeKnownIllegalToken(state_, pos_);
       TEST(!result);
       TEST(pos_ == oldPos_);
     }
@@ -1175,7 +1176,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "\xF0\x90\x8D\x88";
-      auto result = Tokenizer::consumeKnownIllegalToken(pos_);
+      auto result = Tokenizer::consumeKnownIllegalToken(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "\xF0");
       expect(1, 2);
@@ -1185,7 +1186,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "`hello";
-      auto result = Tokenizer::consumeKnownIllegalToken(pos_);
+      auto result = Tokenizer::consumeKnownIllegalToken(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "`");
       expect(1, 2);
@@ -1195,7 +1196,7 @@ struct TokenizerBasics
     {
       reset();
       pos_.pos_ = "````hello";
-      auto result = Tokenizer::consumeKnownIllegalToken(pos_);
+      auto result = Tokenizer::consumeKnownIllegalToken(state_, pos_);
       TEST(result.has_value());
       TEST(result->token_ == "````");
       expect(1, 5);

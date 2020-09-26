@@ -580,3 +580,27 @@ String zax::stringReplace(
 
   return output;
 }
+
+//-----------------------------------------------------------------------------
+std::optional<int> zax::toInt(const String& input) noexcept
+{
+  try {
+    // filter out decimals and exponents
+    if (String::npos != input.find("."))
+      return {};
+    if (String::npos != input.find("e"))
+      return {};
+    return std::stoi(input);
+  }
+  catch (const std::invalid_argument&) {
+  }
+  catch (const std::out_of_range&) {
+  }
+  return {};
+}
+
+//-----------------------------------------------------------------------------
+std::optional<int> zax::toInt(StringView input) noexcept
+{
+  return toInt(String{input});
+}
