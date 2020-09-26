@@ -94,6 +94,7 @@ public:
 
   ParserPos parserPos_;
   bool skipComments_{};
+  TokenPtr pendingComment_;
 
   std::function<void(ErrorTypes::Error, const TokenConstPtr&, const StringMap&)> errorCallback_;
   std::function<void(WarningTypes::Warning, const TokenConstPtr&, const StringMap&)> warningCallback_;

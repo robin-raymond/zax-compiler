@@ -601,6 +601,8 @@ void Tokenizer::primeNext() noexcept
     token->actualOrigin_.filePath_ = actualFilePath_;
     token->actualOrigin_.location_ = oldPos.actualLocation_;
     token->compileState_ = state_;
+    token->comment_ = pendingComment_;
+    pendingComment_.reset();
     return token;
   } };
 
@@ -642,7 +644,9 @@ void Tokenizer::primeNext() noexcept
     token->type_ = TokenTypes::Type::Comment;
     token->originalToken_ = value->originalToken_;
     token->token_ = value->token_;
-    if (!skipComments)
+    if (skipComments)
+      pendingComment_ = token;
+    else
       parsedTokens_.pushBack(token);
 
     if (value->addNewLine_) {
@@ -804,8 +808,16 @@ void Tokenizer::primeNext() noexcept
       continue;
     }
 
-    if (illegal())
+    if (illegal()) {
+      if (pendingComment_) {
+        auto tokenNewLine{ makeToken() };
+        tokenNewLine->type_ = TokenTypes::Type::Separator;
+        tokenNewLine->originalToken_ = {};
+        tokenNewLine->token_ = {};
+        parsedTokens_.pushBack(tokenNewLine);
+      }
       return;
+    }
 
     oldPos = parserPos_;
   }

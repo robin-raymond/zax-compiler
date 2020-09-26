@@ -411,6 +411,7 @@ struct Token : public TokenTypes
   SourceTypes::Origin actualOrigin_;
 
   CompileStatePtr compileState_;
+  TokenPtr comment_;
 };
 
 } // namespace zax

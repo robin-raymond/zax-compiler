@@ -1098,6 +1098,7 @@ struct ParserLineAssignDirective : public ParserCommon
       "\t;\n"
       "\t;\n");
   }
+
   //-------------------------------------------------------------------------
   void test2() noexcept(false)
   {
@@ -1126,6 +1127,22 @@ struct ParserLineAssignDirective : public ParserCommon
     testCommon(example,
       "\n"
       "[[line=100,increment=2]];\n"
+      "\t;\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test2c() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/lineassign/2c.zax" };
+
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 99, 41 - 8 + 1);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 100, 9);
+    expect(zax::WarningTypes::Warning::StatementSeparatorOperatorRedundant, example, 101, 9);
+
+    testCommon(example,
+      "\n"
+      "[[line=100]] /* hello */ /* hi */;\n"
       "\t;\n"
       "\t;\n");
   }
@@ -1264,6 +1281,7 @@ struct ParserLineAssignDirective : public ParserCommon
     runner([&]() { test1c(); });
     runner([&]() { test2(); });
     runner([&]() { test2b(); });
+    runner([&]() { test2c(); });
     runner([&]() { test3(); });
     runner([&]() { test4(); });
     runner([&]() { test5(); });

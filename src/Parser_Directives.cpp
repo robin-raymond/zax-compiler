@@ -585,6 +585,9 @@ bool Parser::consumeLineAssignDirective(Context& context, Tokenizer::iterator it
 
       for (auto& parsedToken : tokenizer.parsedTokens_) {
         calculateTokenNewLine(parsedToken);
+        for (auto comment{ parsedToken->comment_ }; comment; comment = comment->comment_) {
+          calculateTokenNewLine(comment);
+        }
       }
 
       tokenizer.parserPos_.location_.line_ = calculateNewLine(tokenizer.parserPos_.actualLocation_.line_);

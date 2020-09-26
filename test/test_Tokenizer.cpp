@@ -2539,10 +2539,117 @@ struct TokenizerInstance
       {
         auto token{ *iter };
         validate(token, 8, 1);
-        TEST(token->type_ == zax::Token::Type::Literal);
+        TEST(token->type_ == zax::TokenTypes::Type::Literal);
         TEST(token->originalToken_ == "hello");
         TEST(token->token_ == "hello");
         ++iter;
+        TEST(iter == std::end(get()));
+      }
+    }
+  }
+
+  //-------------------------------------------------------------------------
+  void comment() noexcept(false)
+  {
+    {
+      prepare("/* hello */0.0e+2");
+      tokenizer_->skipComments_ = true;
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        TEST(!!token);
+        TEST(token->type_ == zax::TokenTypes::Type::Number);
+        TEST(token->originalToken_ == "0.0e+2");
+        TEST(token->token_ == "0.0e+2");
+        TEST(iter != std::end(get()));
+
+        TEST(!!token->comment_);
+        TEST(token->comment_->type_ == zax::TokenTypes::Type::Comment);
+        TEST(token->comment_->originalToken_ == "/* hello */");
+        TEST(token->comment_->token_ == " hello ");
+
+        TEST(!token->comment_->comment_);
+
+        ++iter;
+      }
+      {
+        auto token{ *iter };
+        TEST(!token);
+        TEST(iter == std::end(get()));
+      }
+    }
+    {
+      prepare("/* hello *//* hi */  0.0e+2");
+      tokenizer_->skipComments_ = true;
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        TEST(!!token);
+        TEST(token->type_ == zax::TokenTypes::Type::Number);
+        TEST(token->originalToken_ == "0.0e+2");
+        TEST(token->token_ == "0.0e+2");
+        TEST(iter != std::end(get()));
+
+        TEST(!!token->comment_);
+        TEST(token->comment_->type_ == zax::TokenTypes::Type::Comment);
+        TEST(token->comment_->originalToken_ == "/* hi */");
+        TEST(token->comment_->token_ == " hi ");
+
+        TEST(!!token->comment_->comment_);
+        TEST(token->comment_->comment_->type_ == zax::TokenTypes::Type::Comment);
+        TEST(token->comment_->comment_->originalToken_ == "/* hello */");
+        TEST(token->comment_->comment_->token_ == " hello ");
+
+        TEST(!token->comment_->comment_->comment_);
+
+        ++iter;
+      }
+      {
+        auto token{ *iter };
+        TEST(!token);
+        TEST(iter == std::end(get()));
+      }
+    }
+    {
+      prepare("0.0e+2/* hello */");
+      tokenizer_->skipComments_ = true;
+
+      auto iter{ std::begin(get()) };
+
+      {
+        auto token{ *iter };
+        TEST(!!token);
+        TEST(token->type_ == zax::TokenTypes::Type::Number);
+        TEST(token->originalToken_ == "0.0e+2");
+        TEST(token->token_ == "0.0e+2");
+        TEST(iter != std::end(get()));
+
+        ++iter;
+      }
+      {
+        auto token{ *iter };
+        TEST(!!token);
+        TEST(token->type_ == zax::TokenTypes::Type::Separator);
+        TEST(token->originalToken_.empty());
+        TEST(token->token_.empty());
+        TEST(iter != std::end(get()));
+
+        TEST(!!token->comment_);
+        TEST(token->comment_->type_ == zax::TokenTypes::Type::Comment);
+        TEST(token->comment_->originalToken_ == "/* hello */");
+        TEST(token->comment_->token_ == " hello ");
+
+        TEST(!token->comment_->comment_);
+
+        ++iter;
+      }
+      {
+        auto token{ *iter };
+        TEST(!token);
         TEST(iter == std::end(get()));
       }
     }
@@ -2564,6 +2671,7 @@ struct TokenizerInstance
     runner([&]() { simple9(); });
     runner([&]() { simple10(); });
     runner([&]() { continuation(); });
+    runner([&]() { comment(); });
 
     reset();
   }
