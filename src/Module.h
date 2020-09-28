@@ -10,7 +10,7 @@ namespace zax
 
 struct Module
 {
-  Puid id_{ puid() };
+  const Puid id_{ puid() };
 };
 
 } // namespace zax

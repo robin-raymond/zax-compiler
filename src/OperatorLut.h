@@ -22,7 +22,7 @@ struct OperatorLutTypes
 
 struct OperatorLut : public OperatorLutTypes
 {
-  Puid id_{ puid() };
+  const Puid id_{ puid() };
   SymbolLutArray operatorsSymbolLut_;
   OperatorEnumSet operatorsConflicting_;
   OperatorEnumConflictSetMap operatorConflictsWith_;

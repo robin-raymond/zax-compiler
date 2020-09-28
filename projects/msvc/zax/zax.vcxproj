@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\Context.cpp" />
     <ClCompile Include="..\..\..\src\Parser.cpp" />
     <ClCompile Include="..\..\..\src\CompilerState.cpp" />
     <ClCompile Include="..\..\..\src\Parser_Directives.cpp" />
@@ -55,6 +56,7 @@
     <ClInclude Include="..\..\..\src\Module.h" />
     <ClInclude Include="..\..\..\src\OperatorLut.h" />
     <ClInclude Include="..\..\..\src\Panics.h" />
+    <ClInclude Include="..\..\..\src\ParserTypes.h" />
     <ClInclude Include="..\..\..\src\pch.h" />
     <ClInclude Include="..\..\..\src\Source.h" />
     <ClInclude Include="..\..\..\src\Token.h" />

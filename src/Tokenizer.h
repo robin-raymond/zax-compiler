@@ -82,20 +82,20 @@ struct Tokenizer : public TokenizerTypes
 {
 
 public:
-  Puid id_{ puid() };
+  const Puid id_{ puid() };
   TokenList parsedTokens_;
 
   SourceTypes::FilePathPtr filePath_;
   SourceTypes::FilePathPtr actualFilePath_;
   std::pair< std::unique_ptr<std::byte[]>, size_t> rawContents_;
   const std::byte* raw_{};
-  CompileStatePtr state_;
   OperatorLutConstPtr operatorLut_;
 
   ParserPos parserPos_;
   bool skipComments_{};
   TokenPtr pendingComment_;
 
+  std::function<CompileStateConstPtr()> getState_;
   std::function<void(ErrorTypes::Error, const TokenConstPtr&, const StringMap&)> errorCallback_;
   std::function<void(WarningTypes::Warning, const TokenConstPtr&, const StringMap&)> warningCallback_;
 
@@ -104,8 +104,8 @@ public:
   Tokenizer(
     const SourceTypes::FilePathPtr &filePath,
     std::pair< std::unique_ptr<std::byte[]>, size_t>&& rawContents,
-    const CompileStatePtr& compileState,
-    const OperatorLutConstPtr& operatorLut
+    const OperatorLutConstPtr& operatorLut,
+    decltype(getState_)&& getState
   ) noexcept;
   Tokenizer(
     const Tokenizer& original,

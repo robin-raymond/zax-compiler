@@ -2,6 +2,7 @@
 #include "types.h"
 #include "version.h"
 #include "Config.h"
+#include "Context.h"
 #include "CompileState.h"
 #include "Errors.h"
 #include "helpers.h"

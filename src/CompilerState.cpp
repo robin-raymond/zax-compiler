@@ -4,7 +4,7 @@
 using namespace zax;
 
 //-----------------------------------------------------------------------------
-bool CompileState::isWarningAnError(WarningTypes::Warning warning) noexcept
+bool CompileState::isWarningAnError(WarningTypes::Warning warning) const noexcept
 {
   return warnings_.at(warning).forceError_;
 }

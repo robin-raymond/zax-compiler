@@ -121,7 +121,7 @@ struct ErrorTypes
     constexpr const Entries operator()() const noexcept
     {
       return { {
-        {Error::ErrorDirective, "error-directive"},
+        {Error::ErrorDirective, "$message$"},
         {Error::MissingArgument, "missing-argument"},
         {Error::LiteralContainsInvalidSequence, "literal-contains-invalid-sequence"},
         {Error::IncompatibleDirective, "incompatible-directive"},

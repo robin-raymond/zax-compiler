@@ -4,6 +4,7 @@
 
 //#include "ParserException.h"
 #include "CompileState.h"
+#include "Context.h"
 //#include "OperatorLut.h"
 //#include "Source.h"
 //#include "Tokenizer.h"
@@ -14,12 +15,9 @@ using namespace std::string_view_literals;
 
 //-----------------------------------------------------------------------------
 std::optional<Parser::DirectiveResult> Parser::parseDirective(
+  Context& context,
   Tokenizer::iterator iter,
-  std::function<bool(bool, Tokenizer::iterator, StringView)>&& noValueFunc,
-  std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& literalValueFunc,
-  std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& quoteValueFunc,
-  std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& numberValueFunc,
-  std::function<bool(bool, Tokenizer::iterator, StringView, TokenizerPtr)>&& extractedValueFunc) noexcept
+  ParseDirectiveFunctions& functions) noexcept
 {
   if (iter.isEnd())
     return {};
@@ -29,6 +27,8 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 
   const OperatorLut& lut{ *iter.list().operatorLut_ };
 
+  assert(functions.legalName_);
+
   bool lastWasComma{};
   bool syntax{};
   bool forceSyntax{};
@@ -37,6 +37,17 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
   DirectiveResult result;
   result.openIter_ = iter;
   ++iter;
+
+  auto skipToCommaOrClose{ [](Tokenizer::iterator iter) noexcept -> Tokenizer::iterator {
+    while (!iter.isEnd()) {
+      if (isSeparator(*iter))
+        break;
+      if (isCommaOrCloseDirective(*iter))
+        break;
+      ++iter;
+    }
+    return iter;
+  } };
 
   while (!iter.isEnd())
   {
@@ -66,11 +77,21 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
     }
     iter = literal->afterIter_;
 
+    if (!functions.legalName_(primary, literal->name_)) {
+      if (!Parser::isUnknownExtension(literal->name_)) {
+        out(Warning::UnknownDirectiveArgument, *literal->literalIter_);
+        understood = false;
+        break;
+      }
+      iter = skipToCommaOrClose(iter);
+      continue;
+    }
+
     if (!isOperator(*iter, Operator::Assign)) {
       if (!isCommaOrCloseDirective(*iter))
         break;
 
-      bool check{ noValueFunc && noValueFunc(primary, literal->literalIter_, literal->name_) };
+      bool check{ functions.noValueFunc_ && functions.noValueFunc_(primary, literal->literalIter_, literal->name_) };
       if (!check) {
         out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
         understood = false;
@@ -90,45 +111,51 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
       break;
     }
 
+    bool foundLiteral{};
     if (auto assigned{ parseDirectiveLiteral(iter) }; assigned) {
       if (isCommaOrCloseDirective(*assigned->afterIter_)) {
-        iter = assigned->afterIter_;
-        auto check{ literalValueFunc && literalValueFunc(primary, literal->literalIter_, literal->name_, assigned->name_) };
-        if ((!check) && (!isUnknownExtension(literal->name_))) {
-          out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
-          understood = false;
-          break;
+        foundLiteral = true;
+
+        auto check{ functions.literalValueFunc_ && functions.literalValueFunc_(primary, literal->literalIter_, literal->name_, assigned->name_) };
+        bool literalSuccess{ !((!check) && (!isUnknownExtension(literal->name_))) };
+
+        // if this literal was processed then treat it as success, otherwise treat this as an evaluation
+        if (literalSuccess) {
+          iter = assigned->afterIter_;
+          continue;
         }
-        continue;
       }
     }
 
-    if (auto assigned{ parseQuote(iter) }; assigned) {
-      if (isCommaOrCloseDirective(*assigned->afterIter_)) {
-        iter = assigned->afterIter_;
-        auto check{ quoteValueFunc && quoteValueFunc(primary, literal->literalIter_, literal->name_, assigned->quote_) };
-        if ((!check) && (!isUnknownExtension(literal->name_))) {
-          out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
-          understood = false;
-          break;
+    if (!foundLiteral) {
+      if (auto assigned{ parseQuote(iter) }; assigned) {
+        if (isCommaOrCloseDirective(*assigned->afterIter_)) {
+          iter = assigned->afterIter_;
+          auto check{ functions.quoteValueFunc_ && functions.quoteValueFunc_(primary, literal->literalIter_, literal->name_, assigned->quote_) };
+          if ((!check) && (!isUnknownExtension(literal->name_))) {
+            out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
+            understood = false;
+            break;
+          }
+          continue;
         }
-        continue;
+      }
+
+      if (auto assigned{ parseSimpleNumber(iter) }; assigned) {
+        if (isCommaOrCloseDirective(*assigned->afterIter_)) {
+          iter = assigned->afterIter_;
+          auto check{ functions.numberValueFunc_ && functions.numberValueFunc_(primary, literal->literalIter_, literal->name_, assigned->number_) };
+          if ((!check) && (!isUnknownExtension(literal->name_))) {
+            out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
+            understood = false;
+            break;
+          }
+          continue;
+        }
       }
     }
 
-    if (auto assigned{ parseSimpleNumber(iter) }; assigned) {
-      if (isCommaOrCloseDirective(*assigned->afterIter_)) {
-        iter = assigned->afterIter_;
-        auto check{ numberValueFunc && numberValueFunc(primary, literal->literalIter_, literal->name_, assigned->number_) };
-        if ((!check) && (!isUnknownExtension(literal->name_))) {
-          out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
-          understood = false;
-          break;
-        }
-        continue;
-      }
-    }
-    if ((!extractedValueFunc) && (!isUnknownExtension(literal->name_))) {
+    if ((!functions.extractedValueFunc_) && (!isUnknownExtension(literal->name_))) {
       out(Warning::DirectiveNotUnderstood, *iter);
       understood = false;
       break;
@@ -136,18 +163,12 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 
     auto startIter{ iter };
 
-    while (!iter.isEnd()) {
-      if (isSeparator(*iter))
-        break;
-      if (isCommaOrCloseDirective(*iter))
-        break;
-      ++iter;
-    }
+    iter = skipToCommaOrClose(iter);
 
     // scope: check will extract function
     {
-      auto extractedTokenizer{ extract(startIter, iter) };
-      auto check{ extractedValueFunc && extractedValueFunc(primary, literal->literalIter_, literal->name_, extractedTokenizer) };
+      auto extraction{ extract(context, startIter, iter) };
+      auto check{ functions.extractedValueFunc_ && functions.extractedValueFunc_(primary, literal->literalIter_, literal->name_, extraction) };
       if ((!check) && (!isUnknownExtension(literal->name_))) {
         out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
         understood = false;
@@ -183,7 +204,6 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
     }
     ++iter;
   }
-
   result.afterIter_ = iter;
 
   if (syntax)
@@ -193,7 +213,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 }
 
 //-----------------------------------------------------------------------------
-std::optional<ParserTypes::DirectiveLiteral> Parser::parseDirectiveLiteral(Tokenizer::iterator iter) noexcept
+std::optional<ParserDirectiveTypes::DirectiveLiteral> Parser::parseDirectiveLiteral(Tokenizer::iterator iter) noexcept
 {
   if (iter.isEnd())
     return {};
@@ -239,7 +259,9 @@ bool Parser::consumeLineParserDirective(Context& context) noexcept
 
   auto primaryLiteral{ parseDirectiveLiteral(iter + 1) };
   if (!primaryLiteral) {
-    auto directive{ parseDirective(iter, {}, {}, {}, {}, {}) };
+    ParseDirectiveFunctions nothing;
+    nothing.legalName_ = [](bool, StringView) noexcept -> bool { return true; };
+    auto directive{ parseDirective(context, iter, nothing) };
     assert(directive);
     iter = directive->afterIter_;
     (void)consumeTo(directive->afterIter_);
@@ -265,6 +287,12 @@ bool Parser::consumeLineParserDirective(Context& context) noexcept
       return false;
     return consumeLineAssignDirective(context, iter);
   }
+  if ("panic"sv == primaryLiteral->name_)
+    return consumePanicDirective(context, iter);
+  if ("warning"sv == primaryLiteral->name_)
+    return consumeWarningDirective(context, iter);
+  if ("error"sv == primaryLiteral->name_)
+    return consumeErrorDirective(context, iter);
 
   return false;
 }
@@ -278,7 +306,21 @@ bool Parser::consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator
   bool foundRequired{};
   bool foundGenerated{};
 
-  auto literalValueFunc{ [&asset, &foundRequired, &foundGenerated](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [isSource](bool primary, StringView name) noexcept -> bool {
+    if (primary)
+      return true;
+    if ("required"sv == name)
+      return true;
+    if ("generated"sv == name)
+      return true;
+    if ((!isSource) && ("rename"sv == name))
+      return true;
+    return false;
+  };
+
+  functions.literalValueFunc_ = [&asset, &foundRequired, &foundGenerated](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     if (primary)
       return false;
     if ("required"sv == name) {
@@ -302,16 +344,13 @@ bool Parser::consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator
       return true;
     }
     return false;
-  } };
+  };
 
-  auto quoteValueFunc{ [isSource , &asset, &foundSourceOrAsset, &foundRename](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  functions.quoteValueFunc_ = [isSource , &asset, &foundSourceOrAsset, &foundRename](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     if (value.empty())
       return false;
     if (primary) {
       assert(!foundSourceOrAsset);
-      StringView useName{ isSource ? "source"sv : "asset"sv };
-      if (useName != name)
-        return false;
       asset.token_ = (*foundAt);
       asset.file_ = value;
       foundSourceOrAsset = true;
@@ -324,14 +363,11 @@ bool Parser::consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator
     asset.rename_ = value;
     foundRename = true;
     return true;
-  } };
+  };
 
-  auto extractedValueFunc{ [isSource , &asset, &foundSourceOrAsset, &foundRename](bool primary, Tokenizer::iterator foundAt, StringView name, TokenizerPtr value) noexcept -> bool {
+  functions.extractedValueFunc_ = [isSource , &asset, &foundSourceOrAsset, &foundRename](bool primary, Tokenizer::iterator foundAt, StringView name, Extraction& value) noexcept -> bool {
     if (primary) {
       assert(!foundSourceOrAsset);
-      StringView useName{ isSource ? "source"sv : "asset"sv };
-      if (useName != name)
-        return false;
       asset.unresolvedFile_ = value;
       foundSourceOrAsset = true;
       return true;
@@ -343,16 +379,9 @@ bool Parser::consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator
     asset.unresolvedRename_ = value;
     foundRename = true;
     return true;
-  } };
+  };
 
-  auto directive{ parseDirective(
-    iter,
-    {},
-    literalValueFunc,
-    quoteValueFunc,
-    {},
-    extractedValueFunc
-  ) };
+  auto directive{ parseDirective(context, iter, functions) };
 
   assert(directive);
 
@@ -376,20 +405,19 @@ bool Parser::consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator
 //-----------------------------------------------------------------------------
 bool Parser::consumeTabStopDirective(Context& context, Tokenizer::iterator iter) noexcept
 {
-  bool foundPrimary{};
-
   std::optional<int> applyTabStop{};
 
-  auto numberValueFunc{ [&foundPrimary, &applyTabStop](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
-    if (!primary)
-      return false;
+  ParseDirectiveFunctions functions;
 
-    assert(!foundPrimary);
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    return primary;
+  };
 
+  functions.numberValueFunc_ = [&applyTabStop](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    assert(primary);
     assert("tab-stop"sv == name);
     assert(!foundAt.isEnd());
 
-    foundPrimary = true;
     auto numValue{ toInt(value) };
     if (!numValue)
       return false;
@@ -397,35 +425,24 @@ bool Parser::consumeTabStopDirective(Context& context, Tokenizer::iterator iter)
       return false;
     applyTabStop = *numValue;
     return true;
-  } };
+  };
 
-  auto extractedValueFunc{ [&foundPrimary](bool primary, Tokenizer::iterator foundAt, StringView name, TokenizerPtr value) noexcept -> bool {
-    if (!primary)
-      return false;
-
-    assert(!foundPrimary);
-
+  functions.extractedValueFunc_ = [](bool primary, Tokenizer::iterator foundAt, StringView name, Extraction& value) noexcept -> bool {
+    assert(primary);
     assert("tab-stop"sv == name);
-
-    foundPrimary = true;
 
 #define RESOLVE_TAB_STOP_NOW 1
 #define RESOLVE_TAB_STOP_NOW 2
     return true;
-  } };
+  };
 
-  auto directive{ parseDirective(
-    iter,
-    {},
-    {},
-    {},
-    numberValueFunc,
-    extractedValueFunc
-  ) };
+  auto directive{ parseDirective(context, iter, functions) };
 
   assert(directive);
-  if (directive->success_ && applyTabStop)
-    (*directive->openIter_)->compileState_->tabStopWidth_ = *applyTabStop;
+  if (directive->success_ && applyTabStop) {
+    context.state_ = CompileState::fork(context.state());
+    context.state_->tabStopWidth_ = *applyTabStop;
+  }
 
   (void)consumeTo(directive->afterIter_);
   return true;
@@ -434,15 +451,16 @@ bool Parser::consumeTabStopDirective(Context& context, Tokenizer::iterator iter)
 //-----------------------------------------------------------------------------
 bool Parser::consumeFileAssignDirective(Context& context, Tokenizer::iterator iter) noexcept
 {
-  bool foundPrimary{};
-
   String applyFileName;
 
-  auto quoteValueFunc{ [&foundPrimary, &applyFileName](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
-    if (!primary)
-      return false;
+  ParseDirectiveFunctions functions;
 
-    assert(!foundPrimary);
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    return primary;
+  };
+
+  functions.quoteValueFunc_ = [&applyFileName](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    assert(primary);
 
     if (value.empty())
       return false;
@@ -451,33 +469,20 @@ bool Parser::consumeFileAssignDirective(Context& context, Tokenizer::iterator it
     assert(!foundAt.isEnd());
 
     applyFileName = value;
-    foundPrimary = true;
     return true;
-  } };
+  };
 
-  auto extractedValueFunc{ [&foundPrimary](bool primary, Tokenizer::iterator foundAt, StringView name, TokenizerPtr value) noexcept -> bool {
-    if (!primary)
-      return false;
-
-    assert(!foundPrimary);
+  functions.extractedValueFunc_ = [](bool primary, Tokenizer::iterator foundAt, StringView name, Extraction& value) noexcept -> bool {
+    assert(primary);
 
     assert("file"sv == name);
-
-    foundPrimary = true;
 
 #define RESOLVE_FILE_NAME_NOW 1
 #define RESOLVE_FILE_NAME_NOW 2
     return true;
-  } };
+  };
 
-  auto directive{ parseDirective(
-    iter,
-    {},
-    {},
-    quoteValueFunc,
-    {},
-    extractedValueFunc
-  ) };
+  auto directive{ parseDirective(context, iter, functions) };
 
   assert(directive);
   if (directive->success_ && (!applyFileName.empty())) {
@@ -494,14 +499,23 @@ bool Parser::consumeFileAssignDirective(Context& context, Tokenizer::iterator it
 //-----------------------------------------------------------------------------
 bool Parser::consumeLineAssignDirective(Context& context, Tokenizer::iterator iter) noexcept
 {
-  bool foundPrimary{};
   bool foundIncrement{};
 
   int deltaFrom{};
   std::optional<int> applyLine{};
   std::optional<int> applySkip{};
 
-  auto numberValueFunc{ [&foundPrimary, &foundIncrement, &applyLine, &applySkip, &deltaFrom](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    if (primary)
+      return true;
+    if ("increment"sv == name)
+      return true;
+    return false;
+  };
+
+  functions.numberValueFunc_ = [&foundIncrement, &applyLine, &applySkip, &deltaFrom](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     assert(!foundAt.isEnd());
 
     auto numValue{ toInt(value) };
@@ -509,41 +523,33 @@ bool Parser::consumeLineAssignDirective(Context& context, Tokenizer::iterator it
       return false;
 
     if (primary) {
-      assert(!foundPrimary);
-
       assert("line"sv == name);
 
-      foundPrimary = true;
       applyLine = *numValue;
       deltaFrom = (*foundAt)->actualOrigin_.location_.line_;
       return true;
     }
 
-    if ("increment"sv != name)
-      return false;
+    assert("increment"sv == name);
     if (foundIncrement)
       return false;
 
     foundIncrement = true;
     applySkip = *numValue;
     return true;
-  } };
+  };
 
-  auto extractedValueFunc{ [&foundPrimary, &foundIncrement](bool primary, Tokenizer::iterator foundAt, StringView name, TokenizerPtr value) noexcept -> bool {
+  functions.extractedValueFunc_ = [&foundIncrement](bool primary, Tokenizer::iterator foundAt, StringView name, Extraction& value) noexcept -> bool {
     if (primary) {
-      assert(!foundPrimary);
-
       assert("line"sv == name);
 
-      foundPrimary = true;
 #define RESOLVE_LINE_NOW 1
 #define RESOLVE_LINE_NOW 2
       //applyLine =
       return true;
     }
 
-    if ("increment"sv != name)
-      return false;
+    assert("increment"sv == name);
     if (foundIncrement)
       return false;
 
@@ -552,16 +558,9 @@ bool Parser::consumeLineAssignDirective(Context& context, Tokenizer::iterator it
     foundIncrement = true;
     //applySkip =
     return true;
-  } };
+  };
 
-  auto directive{ parseDirective(
-    iter,
-    {},
-    {},
-    {},
-    numberValueFunc,
-    extractedValueFunc
-  ) };
+  auto directive{ parseDirective(context, iter, functions) };
 
   assert(directive);
   if (directive->success_) {
@@ -598,11 +597,449 @@ bool Parser::consumeLineAssignDirective(Context& context, Tokenizer::iterator it
   return true;
 }
 
+namespace {
+
+//-----------------------------------------------------------------------------
+template <typename TEnumType, typename TEnumTraits, bool VAllowMessage, bool VAllowOption>
+std::optional<ParserDirectiveTypes::DirectiveResult> consumeFaultDirective(
+  Parser& parser,
+  Context& context,
+  Tokenizer::iterator iter,
+  String& outMessage,
+  std::optional<ParserDirectiveTypes::FaultOptions>& outOption,
+  std::optional<TEnumType>& outWhich,
+  String &outFoundUnknown,
+  StringMap& outMapping) noexcept
+{
+  assert(!iter.isEnd());
+
+  String lastName;
+  std::optional<TEnumType> useEnum;
+
+  ParserDirectiveTypes::ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [&useEnum](bool primary, StringView name) noexcept -> bool {
+    useEnum.reset();
+    if (primary)
+      return true;
+    if constexpr (VAllowMessage) {
+      if ("name"sv == name)
+        return true;
+      if ("value"sv == name)
+        return true;
+    }
+    useEnum = TEnumTraits::toEnum(name);
+    if (useEnum.has_value())
+      return true;
+    // treat the unknown extension as handled
+    if (Parser::isUnknownExtension(name))
+      return true;
+    return false;
+  };
+
+  functions.noValueFunc_ = [&outWhich, &outFoundUnknown, &useEnum](bool primary, Tokenizer::iterator foundAt, StringView name) noexcept -> bool {
+    if (primary)
+      return false;
+    if ((outWhich) || (!outFoundUnknown.empty()))
+      return false;
+    outWhich = useEnum;
+    if (!outWhich) {
+      if (Parser::isUnknownExtension(name)) {
+        outFoundUnknown = name;
+        return true;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  functions.literalValueFunc_ = [&outOption, &outWhich, &outFoundUnknown](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    if (!primary)
+      return false;
+
+    if constexpr (VAllowOption) {
+      auto option{ ParserDirectiveTypes::FaultOptionsTraits::toEnum(value) };
+      if (option) {
+        outOption = option;
+        return true;
+      }
+    }
+    auto which{ TEnumTraits::toEnum(value) };
+    if (which) {
+      outWhich = which;
+      return true;
+    }
+    if (Parser::isUnknownExtension(value)) {
+      outFoundUnknown = value;
+      return true;
+    }
+    return false;
+  };
+
+  functions.quoteValueFunc_ = [&outMessage, &outOption, &lastName, &outMapping](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    if constexpr (VAllowMessage) {
+      if (primary) {
+        outMessage = value;
+        return true;
+      }
+
+      if (outOption)
+        return false;
+
+      if ("name"sv == name) {
+        if (!lastName.empty())
+          return false;
+        lastName = value;
+        return true;
+      }
+      if ("value"sv == name) {
+        if (lastName.empty())
+          return false;
+        outMapping[lastName] = value;
+        lastName.clear();
+        return true;
+      }
+    }
+    return false;
+  };
+
+  functions.extractedValueFunc_ = [&outMessage, &lastName, &outMapping](bool primary, Tokenizer::iterator foundAt, StringView name, ParserTypes::Extraction& value) noexcept -> bool {
+    if constexpr (VAllowMessage) {
+      if (primary) {
+#define RESOLVE_MESSAGE_NOW 1
+#define RESOLVE_MESSAGE_NOW 2
+        //message =
+        return true;
+      }
+
+      if ("name"sv == name) {
+        if (!lastName.empty())
+          return false;
+#define RESOLVE_NAME_NOW 1
+#define RESOLVE_NAME_NOW 2
+        return true;
+      }
+
+      if ("value"sv == name) {
+        if (lastName.empty())
+          return false;
+#define RESOLVE_NAME_VALUE_NOW 1
+#define RESOLVE_NAME_VALUE_NOW 2
+        return true;
+      }
+    }
+    return false;
+  };
+
+  auto result{ parser.parseDirective(context, iter, functions) };
+  if (result) {
+    if (result->success_) {
+      if (!lastName.empty()) {
+        result->success_ = false;
+        parser.out(WarningTypes::Warning::DirectiveNotUnderstood, *result->literalIter_);
+      }
+    }
+  }
+  return result;
+}
+
+//-----------------------------------------------------------------------------
+bool applyToParsedTokens(
+  Context& context,
+  Tokenizer& tokenizer,
+  CompileStatePtr state,
+  bool stopAtSeparator) noexcept {
+
+  for (auto& token : tokenizer.parsedTokens_) {
+    token->compileState_ = state;
+    for (auto comment = token->comment_; comment; comment = comment->comment_) {
+      token->compileState_ = state;
+    }
+    if (stopAtSeparator) {
+      if (Parser::isSeparator(token)) {
+        context.singleLineState_.reset();
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+
+//-----------------------------------------------------------------------------
+void applyToSources(
+  Context& context,
+  CompileStatePtr state,
+  bool stopAtSeparator = false) noexcept
+{
+  bool topmost{ true };
+  auto& sources{ context.parser().sources_ };
+  for (auto& source : sources) {
+    if (!applyToParsedTokens(context, *source->tokenizer_, state, topmost && stopAtSeparator))
+      return;
+    topmost = false;
+  }
+}
+
+//-----------------------------------------------------------------------------
+template <typename TFaultEnum, typename TFaultType, bool VAllowError> 
+void applyFaultDirective(
+  Context& context,
+  Tokenizer::iterator literalIter,
+  std::optional<ParserDirectiveTypes::FaultOptions> option,
+  std::optional<TFaultEnum> which,
+  std::function<TFaultType&(CompileState&)>&& getFaultFunc
+) noexcept
+{
+  assert(getFaultFunc);
+  auto& parser{ context.parser() };
+  switch (option.value()) {
+    case ParserDirectiveTypes::FaultOptions::Yes: {
+      context.singleLineState_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.singleLineState_).enable(which.value());
+      else
+        getFaultFunc(*context.singleLineState_).enableAll();
+      applyToSources(context, context.singleLineState_, true);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::No: {
+      context.singleLineState_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.singleLineState_).disable(which.value());
+      else
+        getFaultFunc(*context.singleLineState_).disableAll();
+      applyToSources(context, context.singleLineState_, true);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Always: {
+      context.state_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.state_).enable(which.value());
+      else
+        getFaultFunc(*context.state_).enableAll();
+      applyToSources(context, context.state_);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Never: {
+      context.state_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.state_).disable(which.value());
+      else
+        getFaultFunc(*context.state_).disableAll();
+      applyToSources(context, context.state_);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Error: {
+      if constexpr (!VAllowError) {
+        parser.out(WarningTypes::Warning::DirectiveNotUnderstood, *(literalIter));
+        break;
+      }
+      else {
+        context.state_ = CompileState::fork(context.state());
+        if (which)
+          getFaultFunc(*context.state_).enableForceError(which.value());
+        else
+          getFaultFunc(*context.state_).enableForceErrorAll();
+        applyToSources(context, context.state_);
+      }
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Default: {
+      context.state_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.state_).applyDefault(which.value());
+      else
+        getFaultFunc(*context.state_).defaultAll();
+      applyToSources(context, context.state_);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Lock: {
+      context.state_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.state_).lock(which.value(), parser.id_);
+      else
+        getFaultFunc(*context.state_).lockAll(parser.id_);
+      applyToSources(context, context.state_);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Unlock: {
+      context.state_ = CompileState::fork(context.state());
+      if (which)
+        getFaultFunc(*context.state_).unlock(which.value(), parser.id_);
+      else
+        getFaultFunc(*context.state_).unlockAll(parser.id_);
+      applyToSources(context, context.state_);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Push: {
+      if (which) {
+        parser.out(WarningTypes::Warning::DirectiveNotUnderstood, *(literalIter));
+        break;
+      }
+      context.state_ = CompileState::fork(context.state());
+      getFaultFunc(*context.state_).push();
+      applyToSources(context, context.state_);
+      break;
+    }
+    case ParserDirectiveTypes::FaultOptions::Pop: {
+      if (which) {
+        parser.out(WarningTypes::Warning::DirectiveNotUnderstood, *(literalIter));
+        break;
+      }
+      auto oldState{ context.state_ };
+      context.state_ = CompileState::fork(context.state());
+      if (!getFaultFunc(*context.state_).pop()) {
+        context.state_ = oldState;
+        parser.out(ErrorTypes::Error::UnmatchedPush, *(literalIter));
+        break;
+      }
+      applyToSources(context, context.state_);
+      break;
+    }
+  }
+}
+
+} // namespace
+
+//-----------------------------------------------------------------------------
+bool Parser::consumePanicDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  String message;
+  std::optional<ParserDirectiveTypes::FaultOptions> option;
+  std::optional<PanicTypes::Panic> which;
+  String foundUnknown;
+  StringMap mapping;
+  auto directive{ consumeFaultDirective<PanicTypes::Panic, PanicTypes::PanicTraits, false, true>(*this, context, iter, message, option, which, foundUnknown, mapping) };
+  if (!directive)
+    return false;
+
+  iter = directive->afterIter_;
+
+  do {
+    if (!directive->success_)
+      break;
+
+    if (!option) {
+      out(Warning::DirectiveNotUnderstood, *(directive->literalIter_));
+      break;
+    }
+
+    if (!foundUnknown.empty())
+      break;
+
+    applyFaultDirective<PanicTypes::Panic, Panics, false>(
+      context,
+      directive->literalIter_,
+      option,
+      which,
+      [](CompileState& state) noexcept -> Panics& { return state.panics_; }
+    );
+  } while (false);
+
+  (void)consumeTo(iter);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeWarningDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  String message;
+  std::optional<ParserDirectiveTypes::FaultOptions> option;
+  std::optional<WarningTypes::Warning> which;
+  String foundUnknown;
+  StringMap mapping;
+  auto directive{ consumeFaultDirective<WarningTypes::Warning, WarningTypes::WarningTraits, true, true>(*this, context, iter, message, option, which, foundUnknown, mapping) };
+  if (!directive)
+    return false;
+
+  iter = directive->afterIter_;
+
+  do {
+    if (!directive->success_)
+      break;
+
+    if (!message.empty()) {
+      mapping["$message$"] = message;
+      assert(!option);
+    }
+
+    if (!option) {
+      if (which) {
+        out(*which, *(directive->literalIter_), mapping);
+        break;
+      }
+
+      if (!foundUnknown.empty()) {
+        if (message.empty())
+          mapping["$message$"] = foundUnknown;
+      }
+      out(WarningTypes::Warning::WarningDirective, *(directive->literalIter_), mapping);
+      break;
+    }
+
+    if (!foundUnknown.empty())
+      break;
+
+    applyFaultDirective<WarningTypes::Warning, Warnings, true>(
+      context,
+      directive->literalIter_,
+      option,
+      which,
+      [](CompileState& state) noexcept -> Warnings& { return state.warnings_; }
+    );
+  } while (false);
+
+  (void)consumeTo(iter);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeErrorDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  String message;
+  std::optional<ParserDirectiveTypes::FaultOptions> option;
+  std::optional<ErrorTypes::Error> which;
+  String foundUnknown;
+  StringMap mapping;
+  auto directive{ consumeFaultDirective<ErrorTypes::Error, ErrorTypes::ErrorTraits, true, false>(*this, context, iter, message, option, which, foundUnknown, mapping) };
+  if (!directive)
+    return false;
+
+  assert(!option);
+
+  iter = directive->afterIter_;
+
+  do {
+    if (!directive->success_)
+      break;
+
+    if (!message.empty()) {
+      mapping["$message$"] = message;
+    }
+
+    if (which) {
+      out(*which, *(directive->literalIter_), mapping);
+      break;
+    }
+
+    if (!foundUnknown.empty()) {
+      if (message.empty())
+        mapping["$message$"] = foundUnknown;
+    }
+
+    out(ErrorTypes::Error::ErrorDirective, *(directive->literalIter_), mapping);
+  } while (false);
+
+  (void)consumeTo(iter);
+  return true;
+}
+
 //-----------------------------------------------------------------------------
 void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
 {
-  if ((asset.unresolvedFile_) ||
-      (asset.unresolvedRename_)) {
+  if ((asset.unresolvedFile_.hasValue()) ||
+      (asset.unresolvedRename_.hasValue())) {
 #define TODO_RESOLVED_ASSET 1
 #define TODO_RESOLVED_ASSET 2
     return;
@@ -610,7 +1047,7 @@ void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
 
   SourceAsset newAsset;
   newAsset.token_ = asset.token_;
-  newAsset.compileState_ = pickState(context, asset.token_);
+  newAsset.compileState_ = context.state();
   newAsset.filePath_ = asset.file_;
   newAsset.fullFilePath_ = asset.file_;
   newAsset.required_ = asset.required_;
@@ -649,7 +1086,7 @@ void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
 //-----------------------------------------------------------------------------
 void Parser::handleSource(Context& context, SourceAssetDirective& source) noexcept
 {
-  if (source.unresolvedFile_) {
+  if (source.unresolvedFile_.hasValue()) {
 #define TODO_RESOLVED_SOURCE 1
 #define TODO_RESOLVED_SOURCE 2
     return;
@@ -657,7 +1094,7 @@ void Parser::handleSource(Context& context, SourceAssetDirective& source) noexce
   
   SourceAsset newSource;
   newSource.token_ = source.token_;
-  newSource.compileState_ = pickState(context, source.token_);
+  newSource.compileState_ = context.state();
   newSource.filePath_ = source.file_;
   newSource.fullFilePath_ = source.file_;
   newSource.required_ = source.required_;

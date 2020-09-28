@@ -2,162 +2,26 @@
 #pragma once
 
 #include "types.h"
-#include "Config.h"
-#include "Errors.h"
-#include "Warnings.h"
-#include "Informationals.h"
-#include "Token.h"
-#include "TokenList.h"
-#include "Tokenizer.h"
+#include "ParserTypes.h"
 
 namespace zax
 {
-
-  //-----------------------------------------------------------------------------
-  struct ParserTypes
-{
-  using Operator = TokenTypes::Operator;
-  using Error = ErrorTypes::Error;
-  using Warning = WarningTypes::Warning;
-  using Informational = InformationalTypes::Informational;
-  using TokenType = TokenTypes::Type;
-
-  using ModuleMap = std::map<String, ModulePtr>;
-  using ModuleList = std::list<ModulePtr>;
-  using SourceList = std::list<SourcePtr>;
-
-  struct Callbacks
-  {
-    std::function<void(Error, const TokenConstPtr& token, const StringMap&)> fatal_;
-    std::function<void(Error, const TokenConstPtr& token, const StringMap&)> error_;
-    std::function<void(Warning, const TokenConstPtr& token, const StringMap&)> warning_;
-    std::function<void(Informational, const TokenConstPtr& token, const StringMap&)> info_;
-
-    std::function<bool()> shouldAbort_;
-  };
-
-  struct DirectiveResult
-  {
-    Tokenizer::iterator openIter_;
-    Tokenizer::iterator closeIter_;
-    Tokenizer::iterator literalIter_;
-    Tokenizer::iterator afterIter_;
-    bool success_{ true };
-  };
-  struct DirectiveLiteral
-  {
-    Tokenizer::iterator literalIter_;
-    Tokenizer::iterator afterIter_;
-    String name_;
-  };
-
-  struct QuoteResult {
-    Tokenizer::iterator quoteIter_;
-    Tokenizer::iterator afterIter_;
-    String quote_;
-  };
-  struct NumberResult {
-    Tokenizer::iterator numberIter_;
-    Tokenizer::iterator afterIter_;
-    String number_;
-  };
-};
-
-//-----------------------------------------------------------------------------
-struct ParserDirectiveTypes
-{
-  enum class SourceAssetRequired {
-    Yes,
-    No,
-    Warn
-  };
-
-  struct SourceAssetRequiredDeclare final : public zs::EnumDeclare<SourceAssetRequired, 3>
-  {
-    constexpr const Entries operator()() const noexcept
-    {
-      return { {
-        {SourceAssetRequired::Yes, "yes"},
-        {SourceAssetRequired::No, "no"},
-        {SourceAssetRequired::Warn, "warn"}
-      } };
-    }
-  };
-
-  using SourceAssetRequiredTraits = zs::EnumTraits<SourceAssetRequired, SourceAssetRequiredDeclare>;
-
-  enum class YesNo {
-    Yes,
-    No
-  };
-  struct YesNoDeclare final : public zs::EnumDeclare<YesNo, 2>
-  {
-    constexpr const Entries operator()() const noexcept
-    {
-      return { {
-        {YesNo::Yes, "yes"},
-        {YesNo::No, "no"}
-      } };
-    }
-  };
-
-  using YesNoTraits = zs::EnumTraits<YesNo, YesNoDeclare>;
-
-  struct SourceAssetDirective
-  {
-    TokenConstPtr token_;
-    String file_;
-    String rename_;
-    TokenizerPtr unresolvedFile_;
-    TokenizerPtr unresolvedRename_;
-    SourceAssetRequired required_{};
-    bool generated_{};
-  };
-};
-
-//-----------------------------------------------------------------------------
-struct ParserOtherTypes
-{
-  struct SourceAsset {
-    TokenConstPtr token_;
-    CompileStatePtr compileState_;
-    String filePath_;
-    String fullFilePath_;
-    String renameFilePath_;
-    ParserDirectiveTypes::SourceAssetRequired required_{};
-    bool generated_{};
-    bool commandLine_{};
-  };
-
-  using SourceAssetList = std::list<SourceAsset>;
-
-  struct Context
-  {
-    Parser* parser_{};
-    Tokenizer* tokenizer_{};
-    CompileStatePtr singleLineState_;
-
-    Tokenizer& operator*() noexcept { return *tokenizer_; }
-    const Tokenizer& operator*() const noexcept { return *tokenizer_; }
-
-    Tokenizer* operator->() noexcept { return tokenizer_; }
-    const Tokenizer* operator->() const noexcept { return tokenizer_; }
-  };
-};
 
 //-----------------------------------------------------------------------------
 struct Parser : public ParserTypes,
                 public ParserDirectiveTypes,
                 public ParserOtherTypes
 {
+  const Puid id_{ puid() };
   Config config_;
   Callbacks callbacks_;
-  CompileStatePtr activeState_;
   OperatorLutPtr operatorLut_;
 
-  ModulePtr rootModule_;
+  ModuleWeakPtr importer_;
+  ModulePtr module_;
   ModuleMap imports_;
-  ModuleList anonymousImports_;
+
+  ContextPtr rootContext_;
 
   SourceAssetList pendingSources_;
   SourceAssetList pendingAssets_;
@@ -182,12 +46,9 @@ struct Parser : public ParserTypes,
   void processAssets() noexcept;
 
   [[nodiscard]] std::optional<DirectiveResult> parseDirective(
+    Context& context,
     Tokenizer::iterator iter,
-    std::function<bool(bool, Tokenizer::iterator, StringView)>&& noValueFunc,
-    std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& literalValueFunc,
-    std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& quoteValueFunc,
-    std::function<bool(bool, Tokenizer::iterator, StringView, StringView)>&& numberValueFunc,
-    std::function<bool(bool, Tokenizer::iterator, StringView, TokenizerPtr)>&& extractedValueFunc) noexcept;
+    ParseDirectiveFunctions& functions) noexcept;
   [[nodiscard]] static std::optional<DirectiveLiteral> parseDirectiveLiteral(Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] bool consumeLineParserDirective(Context& context) noexcept;
@@ -195,6 +56,9 @@ struct Parser : public ParserTypes,
   [[nodiscard]] bool consumeTabStopDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeFileAssignDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeLineAssignDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumePanicDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeWarningDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeErrorDirective(Context& context, Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] static std::optional<QuoteResult> parseQuote(Tokenizer::iterator iter) noexcept;
   [[nodiscard]] static std::optional<NumberResult> parseSimpleNumber(Tokenizer::iterator iter) noexcept;
@@ -214,9 +78,8 @@ struct Parser : public ParserTypes,
   [[nodiscard]] static TokenConstPtr pickValid(const TokenConstPtr& tokenPreferred, const TokenConstPtr& tokenBackup1, const TokenConstPtr& tokenBackup2) noexcept { return pickValid(pickValid(tokenPreferred, tokenBackup1), tokenBackup2); }
   [[nodiscard]] TokenConstPtr validOrLastValid(const TokenConstPtr& token, Tokenizer& tokenizer) const noexcept;
   [[nodiscard]] TokenConstPtr validOrLastValid(const TokenConstPtr& token, Tokenizer::iterator iter) const noexcept { return validOrLastValid(token, iter.list()); }
-  [[nodiscard]] CompileStatePtr pickState(Context& context, TokenConstPtr token) noexcept;
 
-  [[nodiscard]] TokenizerPtr extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept;
+  [[nodiscard]] Extraction extract(Context& context, Tokenizer::iterator first, Tokenizer::iterator last) noexcept;
 
   void handleAsset(Context& context, SourceAssetDirective&) noexcept;
   void handleSource(Context& context, SourceAssetDirective&) noexcept;
@@ -239,8 +102,13 @@ struct Parser : public ParserTypes,
 
 protected:
   void prime() noexcept;
-  Tokenizer& getTokenizer() noexcept;
+  Tokenizer& getSourceTokenizer() noexcept;
+  TokenizerPtr getSourceTokenizerPtr() noexcept;
 
+  Context& getSourceContext() noexcept;
+  ContextPtr getSourceContextPtr() noexcept;
+
+public:
   void fatal(Error error, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
   void out(Error error, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;
   void out(Warning warning, const TokenConstPtr& token, const StringMap& mapping = {}) noexcept;

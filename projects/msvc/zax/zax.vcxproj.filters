@@ -9,24 +9,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\zax.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\pch.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\helpers.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Token.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Tokenizer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\OperatorLut.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\test\test_common.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -36,10 +18,13 @@
     <ClCompile Include="..\..\..\test\test_Tokenizer.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\TokenList.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\test\test_TokenizerList.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\test\test_helpers.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\test\test_Parser.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\CompilerException.cpp">
@@ -48,8 +33,14 @@
     <ClCompile Include="..\..\..\src\CompilerState.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\test\test_helpers.cpp">
-      <Filter>test</Filter>
+    <ClCompile Include="..\..\..\src\Context.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\helpers.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\OperatorLut.cpp">
+      <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Parser.cpp">
       <Filter>src</Filter>
@@ -57,12 +48,27 @@
     <ClCompile Include="..\..\..\src\Parser_Directives.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\test\test_Parser.cpp">
-      <Filter>test</Filter>
+    <ClCompile Include="..\..\..\src\pch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Token.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Tokenizer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\TokenList.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\zax.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\pch.h">
+    <ClInclude Include="..\..\..\test\common.h">
+      <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\CompilerException.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\CompileState.h">
@@ -83,10 +89,22 @@
     <ClInclude Include="..\..\..\src\helpers.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Informationals.h">
+      <Filter>src</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Module.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\OperatorLut.h">
+      <Filter>src</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\Panics.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Parser.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\pch.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Source.h">
@@ -98,7 +116,13 @@
     <ClInclude Include="..\..\..\src\Tokenizer.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\TokenList.h">
+      <Filter>src</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\src\types.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\version.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Warnings.h">
@@ -107,25 +131,7 @@
     <ClInclude Include="..\..\..\src\zax.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\OperatorLut.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\test\common.h">
-      <Filter>test</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\TokenList.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\version.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\CompilerException.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Informationals.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Parser.h">
+    <ClInclude Include="..\..\..\src\ParserTypes.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

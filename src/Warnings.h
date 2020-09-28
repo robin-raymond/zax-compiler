@@ -109,7 +109,7 @@ struct WarningTypes
     constexpr const Entries operator()() const noexcept
     {
       return { {
-        {Warning::WarningDirective, "warning-directive"},
+        {Warning::WarningDirective, "$message$"},
         {Warning::ToDo, "to-do"},
         {Warning::IntrinsicTypeCastOverflow, "intrinsic-type-cast-overflow"},
         {Warning::SwitchEnum, "switch-enum"},

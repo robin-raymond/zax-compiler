@@ -397,7 +397,7 @@ struct TokenTypes
 
 struct Token : public TokenTypes
 {
-  Puid id_{ puid() };
+  const Puid id_{ puid() };
   Type type_ { Type::Separator };
   bool forcedSeparator_{};
 
@@ -410,7 +410,7 @@ struct Token : public TokenTypes
   SourceTypes::Origin origin_;
   SourceTypes::Origin actualOrigin_;
 
-  CompileStatePtr compileState_;
+  CompileStateConstPtr compileState_;
   TokenPtr comment_;
 };
 

@@ -31,6 +31,22 @@ using optional = std::optional<T>;
 
 using index_type = zs::index_type;
 
+struct Alive
+{
+#ifdef _DEBUG
+  constexpr static uint32_t AliveValue{ 0xABCDB0DB };
+  constexpr static uint32_t DeadValue{ 0xDEADBEEF };
+  uint32_t value_{ AliveValue };
+
+  ~Alive() noexcept { value_ = DeadValue; }
+
+  void check() const noexcept { assert(AliveValue == value_); }
+#else
+  void check() const noexcept {}
+#endif //_DEBUG
+  void operator()() const noexcept { check(); }
+};
+
 ZAX_DECLARE_STRUCT_PTR(CodeBlock);
 ZAX_DECLARE_STRUCT_PTR(Parser);
 ZAX_DECLARE_STRUCT_PTR(ParserTypes);
@@ -38,6 +54,7 @@ ZAX_DECLARE_STRUCT_PTR(CompileState);
 ZAX_DECLARE_STRUCT_PTR(CompilerException);
 ZAX_DECLARE_STRUCT_PTR(Config);
 ZAX_DECLARE_STRUCT_PTR(Context);
+ZAX_DECLARE_STRUCT_PTR(ContextTypes);
 ZAX_DECLARE_STRUCT_PTR(ErrorTypes);
 ZAX_DECLARE_STRUCT_PTR(Module);
 ZAX_DECLARE_STRUCT_PTR(OperatorLutTypes);

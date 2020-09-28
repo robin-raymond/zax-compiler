@@ -36,7 +36,8 @@ struct SourceTypes
 
 struct Source : public SourceTypes
 {
-  ModuleWeakPtr module_;
+  const Puid id_{ puid() };
+  ContextPtr context_;
 
   FilePathPtr realPath_;
   FilePathPtr effectivePath_;

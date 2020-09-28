@@ -7,7 +7,7 @@
 namespace zax
 {
 
-struct PanicsTypes
+struct PanicTypes
 {
   enum class Panic
   {
@@ -48,7 +48,7 @@ struct PanicsTypes
   using PanicTraits = zs::EnumTraits<Panic, PanicDeclare>;
 };
 
-using PanicFaults = Faults<PanicsTypes::Panic, PanicsTypes::PanicTraits>;
+using PanicFaults = Faults<PanicTypes::Panic, PanicTypes::PanicTraits>;
 using Panics = PanicFaults;
 
 } // namespace zax

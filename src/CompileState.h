@@ -44,7 +44,7 @@ struct CompileState
     inline bool inconstant() const { return inconstant_; }
   } functionDefault_;
 
-  bool isWarningAnError(WarningTypes::Warning warning) noexcept;
+  bool isWarningAnError(WarningTypes::Warning warning) const noexcept;
 
   static CompileStatePtr fork(const CompileStateConstPtr& original) noexcept;
 };

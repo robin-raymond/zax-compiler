@@ -30,20 +30,20 @@ bool TokenizerTypes::ParserPos::sameLocation(const ParserPos& rhs) const noexcep
 Tokenizer::Tokenizer(
   const SourceTypes::FilePathPtr& filePath,
   std::pair< std::unique_ptr<std::byte[]>, size_t>&& rawContents,
-  const CompileStatePtr& compileState,
-  const OperatorLutConstPtr& operatorLut
+  const OperatorLutConstPtr& operatorLut,
+  decltype(getState_) && getState
 ) noexcept :
   filePath_(filePath),
   actualFilePath_(filePath),
   rawContents_(std::move(rawContents)),
   raw_(rawContents_.first.get()),
-  state_(compileState),
-  operatorLut_(operatorLut)
+  operatorLut_(operatorLut),
+  getState_(getState)
 {
   assert(filePath_);
   assert(rawContents_.first);
-  assert(state_);
   assert(operatorLut_);
+  assert(getState_);
 
   static_assert(sizeof(std::byte) == sizeof(char));
   parserPos_.pos_ = StringView{ reinterpret_cast<const char *>(raw_), rawContents_.second };
@@ -63,19 +63,19 @@ Tokenizer::Tokenizer(
   parsedTokens_(std::move(tokenList)),
   filePath_(original.filePath_),
   actualFilePath_(original.actualFilePath_),
-  state_(original.state_),
   operatorLut_(original.operatorLut_),
+  skipComments_(original.skipComments_),
+  getState_(original.getState_),
   errorCallback_(original.errorCallback_),
-  warningCallback_(original.warningCallback_),
-  skipComments_(original.skipComments_)
+  warningCallback_(original.warningCallback_)
 {
   constexpr static const char* const nulStr{ "" };
   raw_ = reinterpret_cast<const std::byte*>(nulStr);
 
   assert(filePath_);
   assert(raw_);
-  assert(state_);
   assert(operatorLut_);
+  assert(getState_);
 
   static_assert(sizeof(std::byte) == sizeof(char));
   parserPos_.pos_ = StringView{ reinterpret_cast<const char*>(raw_), rawContents_.second };
@@ -600,7 +600,7 @@ void Tokenizer::primeNext() noexcept
     token->origin_.location_ = oldPos.location_;
     token->actualOrigin_.filePath_ = actualFilePath_;
     token->actualOrigin_.location_ = oldPos.actualLocation_;
-    token->compileState_ = state_;
+    token->compileState_ = getState_();
     token->comment_ = pendingComment_;
     pendingComment_.reset();
     return token;
@@ -610,7 +610,7 @@ void Tokenizer::primeNext() noexcept
     bool skipWhitespace,
     bool& outDidConsumeWhitespace,
     bool& outContainedNewline) noexcept -> bool {
-    auto value{ consumeWhitespace(*state_, parserPos_) };
+    auto value{ consumeWhitespace(*getState_(), parserPos_) };
     if (!value)
       return false;
 
@@ -634,7 +634,7 @@ void Tokenizer::primeNext() noexcept
     bool allowedToInsertNewLine,
     bool& outDidConsumeComment,
     bool& outContainedNewline) noexcept -> bool {
-    auto value{ consumeComment(*state_, parserPos_) };
+    auto value{ consumeComment(*getState_(), parserPos_) };
     if (!value)
       return false;
 
@@ -668,7 +668,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto quote{ [&]() noexcept -> bool {
-    auto value{ consumeQuote(*state_, parserPos_) };
+    auto value{ consumeQuote(*getState_(), parserPos_) };
     if (!value)
       return false;
 
@@ -685,7 +685,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto literal{ [&]() noexcept -> bool {
-    auto value{ consumeLiteral(*state_, parserPos_) };
+    auto value{ consumeLiteral(*getState_(), parserPos_) };
     if (!value)
       return false;
 
@@ -698,7 +698,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto numeric{ [&]() noexcept -> bool {
-    auto value{ consumeNumeric(*state_, parserPos_) };
+    auto value{ consumeNumeric(*getState_(), parserPos_) };
     if (!value)
       return false;
 
@@ -739,7 +739,7 @@ void Tokenizer::primeNext() noexcept
   } };
 
   auto illegal{ [&]() noexcept -> bool {
-    auto value{ consumeKnownIllegalToken(*state_, parserPos_) };
+    auto value{ consumeKnownIllegalToken(*getState_(), parserPos_) };
     if (!value)
       return true;
 
@@ -1077,10 +1077,9 @@ void Tokenizer::clear() noexcept
   auto pos{ start };
 
   while (pos < end) {
-    count(*state_, parserPos_, *pos);
+    count(*getState_(), parserPos_, *pos);
     ++pos;
   }
-
   parserPos_.pos_ = makeStringView(pos, end);
 }
 

@@ -2,6 +2,7 @@
 #include "Parser.h"
 #include "CompilerException.h"
 #include "CompileState.h"
+#include "Context.h"
 #include "OperatorLut.h"
 #include "Source.h"
 #include "Tokenizer.h"
@@ -16,10 +17,8 @@ Parser::Parser(
   const Config& config,
   Callbacks* callbacks) noexcept :
   config_{ config },
-  operatorLut_{ std::make_shared<OperatorLut>() },
-  activeState_{ std::make_shared<CompileState>() }
+  operatorLut_{ std::make_shared<OperatorLut>() }
 {
-  activeState_->tabStopWidth_ = config_.tabStopWidth_;
   if (!callbacks) {
     callbacks_.fatal_ = [](Error error, const TokenConstPtr& token, const StringMap& mapping) noexcept {
       zax::fatal(error, token, mapping);
@@ -42,6 +41,31 @@ Parser::Parser(
 //-----------------------------------------------------------------------------
 void Parser::parse() noexcept
 {
+  auto fixWarningDefault{ [](Warnings& warnings) noexcept {
+    constexpr std::array<WarningTypes::Warning, 6> entries {
+      WarningTypes::Warning::ResultNotCaptured,
+      WarningTypes::Warning::DirectiveNotUnderstood,
+      WarningTypes::Warning::VariableDeclaredButNotUsed,
+      WarningTypes::Warning::UnknownDirective,
+      WarningTypes::Warning::UnknownDirectiveArgument,
+      WarningTypes::Warning::DivideByZero
+    };
+    for (auto entry : entries) {
+      warnings.at(entry).defaultForceError_ = true;
+      warnings.at(entry).forceError_ = true;
+    }
+  } };
+  if (!rootContext_) {
+    rootContext_ = std::make_shared<Context>();
+    rootContext_->thisWeak_ = rootContext_;
+    rootContext_->state_ = std::make_shared<CompileState>();
+    rootContext_->state_->tabStopWidth_ = config_.tabStopWidth_;
+    fixWarningDefault(rootContext_->state_->warnings_);
+    rootContext_->owner_ = id_;
+    rootContext_->parser_ = this;
+    rootContext_->module_ = module_.get();
+  }
+
   while (!shouldAbort()) {
     prime();
     processAssets();
@@ -49,17 +73,14 @@ void Parser::parse() noexcept
     if (sources_.empty())
       break;
 
-    auto& tokenizer{ getTokenizer() };
+    auto& tokenizer{ getSourceTokenizer() };
     if (tokenizer.empty()) {
       processedSources_.push_back(sources_.front());
       sources_.pop_front();
       continue;
     }
 
-    Context context;
-    context.parser_ = this;
-    context.tokenizer_ = &tokenizer;
-    process(context);
+    process(getSourceContext());
   }
 }
 
@@ -231,19 +252,13 @@ TokenConstPtr Parser::validOrLastValid(const TokenConstPtr& token, Tokenizer& to
 }
 
 //-----------------------------------------------------------------------------
-CompileStatePtr Parser::pickState(Context& context, TokenConstPtr token) noexcept
+ParserTypes::Extraction Parser::extract(Context& context, Tokenizer::iterator first, Tokenizer::iterator last) noexcept
 {
-  if (context.singleLineState_)
-    return context.singleLineState_;
-  if (token->compileState_)
-    return token->compileState_;
-  return activeState_;
-}
-
-//-----------------------------------------------------------------------------
-TokenizerPtr Parser::extract(Tokenizer::iterator first, Tokenizer::iterator last) noexcept
-{
-  return std::make_shared<Tokenizer>(first.list(), first.list().extract(first, last));
+  Extraction result;
+  result.context_ = context.thisWeak_.lock()->forkChild(ContextTypes::Type::Expression);
+  result.tokenizer_ = std::make_shared<Tokenizer>(first.list(), first.list().extract(first, last));
+  result.context_->tokenizer_ = result.tokenizer_;
+  return result;
 }
 
 //-----------------------------------------------------------------------------
@@ -382,10 +397,9 @@ bool Parser::isCommaOrCloseDirective(const TokenConstPtr& token) noexcept
 //-----------------------------------------------------------------------------
 bool Parser::isUnknownExtension(const StringView name) noexcept
 {
-  constexpr static StringView prefix{ "x-" };
-  if (name.length() < prefix.length())
+  if (name.length() < unknownPrefix.length())
     return false;
-  return prefix == name.substr(0, prefix.length());
+  return unknownPrefix == name.substr(0, unknownPrefix.length());
 }
 
 //-----------------------------------------------------------------------------
@@ -422,10 +436,10 @@ void Parser::prime() noexcept
 
   if (pendingSources_.size() < 1) {
     for (auto& file : config_.inputFilePaths_) {
-      auto token{ makeInternalToken(activeState_) };
+      auto token{ makeInternalToken(rootContext_->state()) };
       SourceAsset source{};
       source.token_ = token;
-      source.compileState_ = activeState_;
+      source.compileState_ = rootContext_->state();
       source.filePath_ = makeIncludeFile("ignored.bin", file, source.fullFilePath_);
       if (source.filePath_.empty()) {
         // try to load anyway
@@ -471,7 +485,8 @@ void Parser::prime() noexcept
       continue;
 
     auto source{ std::make_shared<Source>() };
-    source->module_ = rootModule_;
+    source->context_ = rootContext_->forkChild(source->id_, ContextTypes::Type::Source);
+    source->context_->state_ = pending.compileState_;
     source->realPath_ = std::make_shared<SourceTypes::FilePath>();
     source->effectivePath_ = source->realPath_;
     source->realPath_->filePath_ = pending.filePath_;
@@ -480,11 +495,12 @@ void Parser::prime() noexcept
     source->tokenizer_ = std::make_shared<Tokenizer>(
       source->realPath_,
       std::move(fileContents),
-      pending.compileState_,
-      operatorLut_);
+      operatorLut_,
+      [context = source->context_] () noexcept -> CompileStateConstPtr { return context->state(); });
     source->tokenizer_->skipComments_ = true;
     source->tokenizer_->errorCallback_ = callbacks_.error_;
     source->tokenizer_->warningCallback_ = callbacks_.warning_;
+    source->context_->tokenizer_ = source->tokenizer_;
     pushFrontSourceList.push_back(source);
   }
   if (pushFrontSourceList.size() > 0) {
@@ -493,12 +509,32 @@ void Parser::prime() noexcept
   pendingSources_.clear();
 }
 
-
 //-----------------------------------------------------------------------------
-Tokenizer& Parser::getTokenizer() noexcept
+Tokenizer& Parser::getSourceTokenizer() noexcept
 {
   assert(!sources_.empty());
   return *(sources_.front()->tokenizer_);
+}
+
+//-----------------------------------------------------------------------------
+TokenizerPtr Parser::getSourceTokenizerPtr() noexcept
+{
+  assert(!sources_.empty());
+  return sources_.front()->tokenizer_;
+}
+
+//-----------------------------------------------------------------------------
+Context& Parser::getSourceContext() noexcept
+{
+  assert(!sources_.empty());
+  return *(sources_.front()->context_);
+}
+
+//-----------------------------------------------------------------------------
+ContextPtr Parser::getSourceContextPtr() noexcept
+{
+  assert(!sources_.empty());
+  return sources_.front()->context_;
 }
 
 //-----------------------------------------------------------------------------
@@ -516,7 +552,10 @@ void Parser::out(Error error, const TokenConstPtr& token, const StringMap& mappi
 //-----------------------------------------------------------------------------
 void Parser::out(Warning warning, const TokenConstPtr& token, const StringMap& mapping) noexcept
 {
-  callbacks_.warning_(warning, token, mapping);
+  assert(token);
+  assert(token->compileState_);
+  if (token->compileState_->warnings_.at(warning).enabled_)
+    callbacks_.warning_(warning, token, mapping);
 }
 
 //-----------------------------------------------------------------------------

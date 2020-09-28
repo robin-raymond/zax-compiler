@@ -1273,7 +1273,7 @@ struct TokenizerInstance
     content.first = std::make_unique<std::byte[]>(value.size());
     content.second = value.size();
     memcpy(content.first.get(), value.data(), sizeof(char) * value.size());
-    tokenizer_.emplace(filePath_, std::move(content), compileState_, operatorLut_);
+    tokenizer_.emplace(filePath_, std::move(content), operatorLut_, [state=compileState_]() -> auto { return state; });
 
     tokenizer_->errorCallback_ = [&](zax::ErrorTypes::Error error, const zax::TokenConstPtr token, const zax::StringMap&) noexcept(false) {
       handleException(error, token);
