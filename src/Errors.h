@@ -57,10 +57,12 @@ struct ErrorTypes
     InlineFunctionNotFinal,
     ConstantSyntax,
     Syntax,
-    OutputFailure
+    OutputFailure,
+    ExplicitLeaseCannotReceiveLast,
+    ExplicitCopyCannotReceiveMove
   };
 
-  struct ErrorDeclare final : public zs::EnumDeclare<Error, 47>
+  struct ErrorDeclare final : public zs::EnumDeclare<Error, 49>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -111,12 +113,14 @@ struct ErrorTypes
         {Error::InlineFunctionNotFinal, "inline-function-not-final"},
         {Error::ConstantSyntax, "constant-syntax"},
         {Error::Syntax, "syntax"},
-        {Error::OutputFailure, "output-failure"}
-      } };
+        {Error::OutputFailure, "output-failure"},
+        {Error::ExplicitLeaseCannotReceiveLast, "explicit-lease-cannot-receive-last"},
+        {Error::ExplicitCopyCannotReceiveMove, "explicit-copy-cannot-receive-move"}
+        } };
     }
   };
 
-  struct ErrorHumanReadableDeclare final : public zs::EnumDeclare<Error, 47>
+  struct ErrorHumanReadableDeclare final : public zs::EnumDeclare<Error, 49>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -167,7 +171,9 @@ struct ErrorTypes
         {Error::InlineFunctionNotFinal, "inline-function-not-final"},
         {Error::ConstantSyntax, "a constant was found to contain a syntax error"},
         {Error::Syntax, "a syntax error was found"},
-        {Error::OutputFailure, "an attempt to generate output or copy an asset to the output ($file$) failed"}
+        {Error::OutputFailure, "an attempt to generate output or copy an asset to the output ($file$) failed"},
+        {Error::ExplicitLeaseCannotReceiveLast, "explicit-lease-cannot-receive-last"},
+        {Error::ExplicitCopyCannotReceiveMove, "explicit-copy-cannot-receive-move"}
       } };
     }
   };

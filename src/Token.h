@@ -133,8 +133,10 @@ struct TokenTypes
     VariadicTypes,
     ScopeOpen,
     ScopeClose,
-    ValueInitializeOpen,
-    ValueInitializeClose,
+    InitializeOpen,
+    InitializeClose,
+    ArrayValueInitializeOpen,
+    ArrayValueInitializeClose,
     DirectiveOpen,
     DirectiveClose,
     Self,
@@ -144,7 +146,7 @@ struct TokenTypes
   };
 
   
-  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 100>
+  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 102>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -241,8 +243,10 @@ struct TokenTypes
         { Operator::VariadicTypes, "$..." },
         { Operator::ScopeOpen, "{" },
         { Operator::ScopeClose, "}" },
-        { Operator::ValueInitializeOpen, "{{" },
-        { Operator::ValueInitializeClose, "}}" },
+        { Operator::InitializeOpen, "{" },
+        { Operator::InitializeClose, "}" },
+        { Operator::ArrayValueInitializeOpen, "[{" },
+        { Operator::ArrayValueInitializeClose, "}]" },
         { Operator::DirectiveOpen, "[[" },
         { Operator::DirectiveClose, "]]" },
         { Operator::Self, "_" },

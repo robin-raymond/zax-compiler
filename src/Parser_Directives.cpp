@@ -2,12 +2,8 @@
 #include "pch.h"
 #include "Parser.h"
 
-//#include "ParserException.h"
 #include "CompileState.h"
 #include "Context.h"
-//#include "OperatorLut.h"
-//#include "Source.h"
-//#include "Tokenizer.h"
 
 using namespace zax;
 

@@ -51,10 +51,11 @@ struct WarningTypes
     BadStyle,
     DescopeDirectiveRequired,
     LeaseOrLast,
+    CopyOrMove,
     NewlineAfterContinuation
   };
 
-  struct WarningDeclare final : public zs::EnumDeclare<Warning, 41>
+  struct WarningDeclare final : public zs::EnumDeclare<Warning, 42>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -99,12 +100,13 @@ struct WarningTypes
         {Warning::BadStyle, "bad-style"},
         {Warning::DescopeDirectiveRequired, "descope-directive-required"},
         {Warning::LeaseOrLast, "lease-or-last"},
+        {Warning::CopyOrMove, "copy-or-move"},
         {Warning::NewlineAfterContinuation, "newline-after-continuation" }
       } };
     }
   };
 
-  struct WarningHumanReadableDeclare final : public zs::EnumDeclare<Warning, 41>
+  struct WarningHumanReadableDeclare final : public zs::EnumDeclare<Warning, 42>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -149,6 +151,7 @@ struct WarningTypes
         {Warning::BadStyle, "bad-style"},
         {Warning::DescopeDirectiveRequired, "descope-directive-required"},
         {Warning::LeaseOrLast, "lease-or-last"},
+        {Warning::CopyOrMove, "copy-or-move"},
         {Warning::NewlineAfterContinuation, "expecting new line after continuation operator" }
       } };
     }

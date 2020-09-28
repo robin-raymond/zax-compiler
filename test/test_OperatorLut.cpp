@@ -137,8 +137,8 @@ struct OperatorLutBasics
       "*"
     });
 
-    expectEatTokens("{{{]~|=fine", "fine", std::vector<StringView>{
-      "{{",
+    expectEatTokens("[{{]~|=fine", "fine", std::vector<StringView>{
+      "[{",
       "{",
       "]",
       "~|="
