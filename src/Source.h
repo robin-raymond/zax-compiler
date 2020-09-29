@@ -2,6 +2,7 @@
 #pragma once
 
 #include "types.h"
+#include "helpers.h"
 
 namespace zax
 {

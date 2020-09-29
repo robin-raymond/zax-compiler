@@ -289,6 +289,14 @@ bool Parser::consumeLineParserDirective(Context& context) noexcept
     return consumeWarningDirective(context, iter);
   if ("error"sv == primaryLiteral->name_)
     return consumeErrorDirective(context, iter);
+  if ("functions"sv == primaryLiteral->name_)
+    return consumeFunctionsDirective(context, iter);
+  if ("types"sv == primaryLiteral->name_)
+    return consumeTypesDirective(context, iter);
+  if ("variables"sv == primaryLiteral->name_)
+    return consumeVariablesDirective(context, iter);
+  if ("deprecate"sv == primaryLiteral->name_)
+    return consumeDeprecateDirective(context, iter);
 
   return false;
 }
@@ -1077,6 +1085,297 @@ void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
   else {
     pendingAssets_.push_back(newAsset);
   }
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeDeprecateDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  std::optional<YesNoAlwaysNever> option{};
+  std::optional<CompileState::Deprecate::Context> csContext{};
+  std::optional<bool> error{};
+  std::optional<SemanticVersion> min;
+  std::optional<SemanticVersion> max;
+
+  auto optionNotSetOrNever{ [&option]() noexcept -> bool {
+    if (!option)
+      return true;
+    switch (*option) {
+      case YesNoAlwaysNever::Yes:     break;
+      case YesNoAlwaysNever::No:      return true;
+      case YesNoAlwaysNever::Always:  break;
+      case YesNoAlwaysNever::Never:   return true;
+    }
+    return false;
+  } };
+
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    if (primary)
+      return true;
+    if ("context"sv == name)
+      return true;
+    if ("error"sv == name)
+      return true;
+    if ("min"sv == name)
+      return true;
+    if ("max"sv == name)
+      return true;
+    return false;
+  };
+
+  functions.noValueFunc_ = [&optionNotSetOrNever, &option, &error](bool primary, Tokenizer::iterator foundAt, StringView name) noexcept -> bool {
+    if (primary) {
+      option = YesNoAlwaysNever::Yes;
+      return true;
+    }
+
+    if (optionNotSetOrNever())
+      return false;
+
+    if (error)
+      return false;
+
+    if ("error"sv != name)
+      return false;
+
+    error = true;
+    return true;
+  };
+
+  functions.literalValueFunc_ = [&optionNotSetOrNever, &option, &csContext](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    if (primary) {
+      option = YesNoAlwaysNeverTraits::toEnum(value);
+      return static_cast<bool>(option);
+    }
+
+    if (optionNotSetOrNever())
+      return false;
+
+    if ("context"sv == name) {
+      if (csContext.has_value())
+        return false;
+      csContext = CompileState::Deprecate::ContextTraits::toEnum(value);
+      if (!csContext)
+        return false;
+      return true;
+    }
+    return false;
+  };
+
+  functions.quoteValueFunc_ = [&optionNotSetOrNever, &min, &max](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    if (primary)
+      return false;
+
+    if (optionNotSetOrNever())
+      return false;
+
+#define VERSIONING_VALIDATION_CHECK 1
+#define VERSIONING_VALIDATION_CHECK 2
+
+    if ("min"sv == name) {
+      if (min.has_value())
+        return false;
+      min = SemanticVersion::convert(value);
+      if (!min)
+        return false;
+      return true;
+    }
+    if ("max"sv == name) {
+      if (max.has_value())
+        return false;
+      max = SemanticVersion::convert(value);
+      if (!max)
+        return false;
+      return true;
+    }
+    return false;
+  };
+
+  auto directive{ parseDirective(context, iter, functions) };
+  assert(directive);
+  if (directive->success_) {
+    bool singleLineState{ false };
+    auto tempState{ CompileState::fork(context.state()) };
+    switch (*option) {
+      case YesNoAlwaysNever::Yes:     singleLineState = true; break;
+      case YesNoAlwaysNever::No:      singleLineState = true; break;
+      case YesNoAlwaysNever::Always:  break;
+      case YesNoAlwaysNever::Never:   break;
+    }
+    if (!optionNotSetOrNever()) {
+      tempState->deprecate_.emplace();
+      tempState->deprecate_->origin_ = (*directive->literalIter_)->origin_;
+      if (csContext)
+        tempState->deprecate_->context_ = *csContext;
+      if (error.has_value())
+        tempState->deprecate_->forceError_ = *error;
+      tempState->deprecate_->min_ = min;
+      tempState->deprecate_->max_ = max;
+    }
+    else
+      tempState->deprecate_.reset();
+    if (!singleLineState)
+      context.state_ = tempState;
+    else
+      context.singleLineState_ = tempState;
+    applyToSources(context, tempState, singleLineState);
+  }
+  (void)consumeTo(directive->afterIter_);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeVariablesDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  enum class VariablesDefault {
+    Mutable,
+    Immutable,
+    Final,
+    Varies
+  };
+
+  struct VariablesDefaultDeclare final : public zs::EnumDeclare<VariablesDefault, 4>
+  {
+    constexpr const Entries operator()() const noexcept
+    {
+      return { {
+        {VariablesDefault::Mutable, "mutable"},
+        {VariablesDefault::Immutable, "immutable"},
+        {VariablesDefault::Final, "final"},
+        {VariablesDefault::Varies, "varies"}
+      } };
+    }
+  };
+
+  using VariablesDefaultTraits = zs::EnumTraits<VariablesDefault, VariablesDefaultDeclare>;
+
+  std::optional<VariablesDefault> _default{};
+
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    return primary;
+  };
+
+  functions.literalValueFunc_ = [&_default](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    _default = VariablesDefaultTraits::toEnum(value);
+    return static_cast<bool>(_default);
+  };
+
+  auto directive{ parseDirective(context, iter, functions) };
+  assert(directive);
+  if (directive->success_) {
+    context.state_ = CompileState::fork(context.state());
+    switch (*_default) {
+      case VariablesDefault::Mutable:     context.state_->variableDefault_.mutable_ = true; break;
+      case VariablesDefault::Immutable:   context.state_->variableDefault_.mutable_ = false; break;
+      case VariablesDefault::Varies:      context.state_->variableDefault_.varies_ = true; break;
+      case VariablesDefault::Final:       context.state_->variableDefault_.varies_ = false; break;
+    }
+    applyToSources(context, context.state_);
+  }
+  (void)consumeTo(directive->afterIter_);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeTypesDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  enum class TypesDefault {
+    Mutable,
+    Immutable,
+    Constant,
+    Inconstant
+  };
+
+  struct TypesDefaultDeclare final : public zs::EnumDeclare<TypesDefault, 4>
+  {
+    constexpr const Entries operator()() const noexcept
+    {
+      return { {
+        {TypesDefault::Mutable, "mutable"},
+        {TypesDefault::Immutable, "immutable"},
+        {TypesDefault::Constant, "constant"},
+        {TypesDefault::Inconstant, "inconstant"}
+      } };
+    }
+  };
+
+  using TypesDefaultTraits = zs::EnumTraits<TypesDefault, TypesDefaultDeclare>;
+
+  std::optional<TypesDefault> _default{};
+
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    return primary;
+  };
+
+  functions.literalValueFunc_ = [&_default](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    _default = TypesDefaultTraits::toEnum(value);
+    return static_cast<bool>(_default);
+  };
+
+  auto directive{ parseDirective(context, iter, functions) };
+  assert(directive);
+  if (directive->success_) {
+    context.state_ = CompileState::fork(context.state());
+    switch (*_default) {
+      case TypesDefault::Mutable:     context.state_->typeDefault_.mutable_ = true; break;
+      case TypesDefault::Immutable:   context.state_->typeDefault_.mutable_ = false; break;
+      case TypesDefault::Constant:    context.state_->typeDefault_.constant_ = true; break;
+      case TypesDefault::Inconstant:  context.state_->typeDefault_.constant_ = false; break;
+    }
+    applyToSources(context, context.state_);
+  }
+  (void)consumeTo(directive->afterIter_);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeFunctionsDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  enum class FunctionsDefault {
+    Constant,
+    Inconstant
+  };
+
+  struct FunctionsDefaultDeclare final : public zs::EnumDeclare<FunctionsDefault, 2>
+  {
+    constexpr const Entries operator()() const noexcept
+    {
+      return { {
+        {FunctionsDefault::Constant, "constant"},
+        {FunctionsDefault::Inconstant, "inconstant"}
+      } };
+    }
+  };
+
+  using FunctionsDefaultTraits = zs::EnumTraits<FunctionsDefault, FunctionsDefaultDeclare>;
+
+  std::optional<FunctionsDefault> _default{};
+
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    return primary;
+  };
+
+  functions.literalValueFunc_ = [& _default](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    _default = FunctionsDefaultTraits::toEnum(value);
+    return static_cast<bool>(_default);
+  };
+
+  auto directive{ parseDirective(context, iter, functions) };
+  assert(directive);
+  if (directive->success_) {
+    context.state_ = CompileState::fork(context.state());
+    context.state_->functionDefault_.constant_ = (*_default) == FunctionsDefault::Constant;
+    applyToSources(context, context.state_);
+  }
+  (void)consumeTo(directive->afterIter_);
+  return true;
 }
 
 //-----------------------------------------------------------------------------

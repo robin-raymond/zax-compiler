@@ -96,6 +96,26 @@ struct ParserDirectiveTypes
 
   using YesNoTraits = zs::EnumTraits<YesNo, YesNoDeclare>;
 
+  enum class YesNoAlwaysNever {
+    Yes,
+    No,
+    Always,
+    Never
+  };
+  struct YesNoAlwaysNeverDeclare final : public zs::EnumDeclare<YesNoAlwaysNever, 4>
+  {
+    constexpr const Entries operator()() const noexcept
+    {
+      return { {
+        {YesNoAlwaysNever::Yes, "yes"},
+        {YesNoAlwaysNever::No, "no"},
+        {YesNoAlwaysNever::Always, "always"},
+        {YesNoAlwaysNever::Never, "never"},
+      } };
+    }
+  };
+  using YesNoAlwaysNeverTraits = zs::EnumTraits<YesNoAlwaysNever, YesNoAlwaysNeverDeclare>;
+
   enum class FaultOptions {
     Yes,
     No,

@@ -59,6 +59,10 @@ struct Parser : public ParserTypes,
   [[nodiscard]] bool consumePanicDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeWarningDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeErrorDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeDeprecateDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeVariablesDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeTypesDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeFunctionsDirective(Context& context, Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] static std::optional<QuoteResult> parseQuote(Tokenizer::iterator iter) noexcept;
   [[nodiscard]] static std::optional<NumberResult> parseSimpleNumber(Tokenizer::iterator iter) noexcept;

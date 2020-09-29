@@ -7,7 +7,11 @@
 
 #include "../src/helpers.h"
 
+using StringView = zax::StringView;
 using StringList = zax::StringList;
+using SemanticVersion = zax::SemanticVersion;
+
+using namespace std::string_view_literals;
 
 namespace zaxTest
 {
@@ -26,8 +30,8 @@ struct HelperBasics
   //-------------------------------------------------------------------------
   void test() noexcept(false)
   {
-    const std::string_view example{ "ignored/testing/a/b/example.txt" };
-    const std::string_view expecting{ "ignored/testing/a/b/testing_1.txt" };
+    const std::string_view example{ "ignored/testing/helpers/a/b/example.txt" };
+    const std::string_view expecting{ "ignored/testing/helpers/a/b/testing_1.txt" };
     std::string fullPath;
     auto filePath{ zax::makeIncludeFile(example, "testing_1.txt", fullPath) };
 
@@ -81,7 +85,7 @@ struct HelperBasics
       auto located2{ zax::locateFile(example, "../2.txt", fullLocated2) };
       TEST(fullPath2 == fullLocated2);
       std::string fullLocated2a;
-      auto located2a{ zax::locateFile(example, "testing/2.txt", fullLocated2a) };
+      auto located2a{ zax::locateFile(example, "helpers/2.txt", fullLocated2a) };
       TEST(fullPath2 == fullLocated2a);
       std::string fullLocated2b;
       auto located2b{ zax::locateFile(example, "2.txt", fullLocated2b) };
@@ -105,10 +109,10 @@ struct HelperBasics
   //-------------------------------------------------------------------------
   void testWildCard() noexcept(false)
   {
-    const std::string path1{ "ignored/test/fruit/apple_fruit" };
-    const std::string path2{ "ignored/test/fruit/banana_fruit" };
-    const std::string path3{ "ignored/test/fruit/caraway_seed" };
-    const std::string path4{ "ignored/test/fruit/dandy_seed" };
+    const std::string path1{ "ignored/testing/helpers/fruit/apple_fruit" };
+    const std::string path2{ "ignored/testing/helpers/fruit/banana_fruit" };
+    const std::string path3{ "ignored/testing/helpers/fruit/caraway_seed" };
+    const std::string path4{ "ignored/testing/helpers/fruit/dandy_seed" };
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path{ path1 }, ec);
@@ -138,7 +142,7 @@ struct HelperBasics
     TEST(zax::writeBinaryFile(path4 + "/helloabc.txt", "hello4"));
 
     std::list<zax::LocateWildCardFilesResult> found;
-    zax::locateWildCardFiles(found, "ignored/fruit/apple_fruit/test.txt", "test/fr*/*_?ruit/hello*.txt");
+    zax::locateWildCardFiles(found, "ignored/testing/helpers/fruit/apple_fruit/test.txt", "testing/helpers/fr*/*_?ruit/hello*.txt");
 
     auto validate{ [&](const std::string& path, const StringList& matches) noexcept -> bool {
       for (auto& entry : found) {
@@ -157,16 +161,16 @@ struct HelperBasics
     } };
     
     TEST(found.size() == 10);
-    TEST(validate("ignored/test/fruit/apple_fruit/hello.txt", StringList{ "uit", "apple", "f", "" }));
-    TEST(validate("ignored/test/fruit/apple_fruit/helloa.txt", StringList{ "uit", "apple", "f", "a" }));
-    TEST(validate("ignored/test/fruit/apple_fruit/helloab.txt", StringList{ "uit", "apple", "f", "ab" }));
-    TEST(validate("ignored/test/fruit/apple_fruit/helloabc.txt", StringList{ "uit", "apple", "f", "abc" }));
-    TEST(validate("ignored/test/fruit/apple_fruit/hellobbc.txt", StringList{ "uit", "apple", "f", "bbc" }));
-    TEST(validate("ignored/test/fruit/banana_fruit/hello.txt", StringList{ "uit", "banana", "f", "" }));
-    TEST(validate("ignored/test/fruit/banana_fruit/helloa.txt", StringList{ "uit", "banana", "f", "a" }));
-    TEST(validate("ignored/test/fruit/banana_fruit/helloab.txt", StringList{ "uit", "banana", "f", "ab" }));
-    TEST(validate("ignored/test/fruit/banana_fruit/helloabc.txt", StringList{ "uit", "banana", "f", "abc" }));
-    TEST(validate("ignored/test/fruit/banana_fruit/hellobbc.txt", StringList{ "uit", "banana", "f", "bbc" }));
+    TEST(validate("ignored/testing/helpers/fruit/apple_fruit/hello.txt", StringList{ "uit", "apple", "f", "" }));
+    TEST(validate("ignored/testing/helpers/fruit/apple_fruit/helloa.txt", StringList{ "uit", "apple", "f", "a" }));
+    TEST(validate("ignored/testing/helpers/fruit/apple_fruit/helloab.txt", StringList{ "uit", "apple", "f", "ab" }));
+    TEST(validate("ignored/testing/helpers/fruit/apple_fruit/helloabc.txt", StringList{ "uit", "apple", "f", "abc" }));
+    TEST(validate("ignored/testing/helpers/fruit/apple_fruit/hellobbc.txt", StringList{ "uit", "apple", "f", "bbc" }));
+    TEST(validate("ignored/testing/helpers/fruit/banana_fruit/hello.txt", StringList{ "uit", "banana", "f", "" }));
+    TEST(validate("ignored/testing/helpers/fruit/banana_fruit/helloa.txt", StringList{ "uit", "banana", "f", "a" }));
+    TEST(validate("ignored/testing/helpers/fruit/banana_fruit/helloab.txt", StringList{ "uit", "banana", "f", "ab" }));
+    TEST(validate("ignored/testing/helpers/fruit/banana_fruit/helloabc.txt", StringList{ "uit", "banana", "f", "abc" }));
+    TEST(validate("ignored/testing/helpers/fruit/banana_fruit/hellobbc.txt", StringList{ "uit", "banana", "f", "bbc" }));
 
     output(__FILE__ "::" __FUNCTION__);
   }
@@ -184,9 +188,131 @@ struct HelperBasics
 };
 
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct HelperSemanticVersion
+{
+
+  //-------------------------------------------------------------------------
+  void reset() noexcept
+  {
+  }
+
+  //-------------------------------------------------------------------------
+  void expect(
+    const SemanticVersion& value,
+    int major,
+    int minor,
+    int patch,
+    StringView preRelease,
+    StringView build) noexcept(false)
+  {
+    TEST(value.major_ == major);
+    TEST(value.minor_ == minor);
+    TEST(value.patch_ == patch);
+    TEST(value.preRelease_ == preRelease);
+    TEST(value.build_ == build);
+  }
+
+  //-------------------------------------------------------------------------
+  void expect(
+    const std::optional<const SemanticVersion>& value,
+    int major,
+    int minor,
+    int patch,
+    StringView preRelease,
+    StringView build) noexcept(false)
+  {
+    TEST(static_cast<bool>(value));
+    expect(*value, major, minor, patch, preRelease, build);
+  }
+
+  //-------------------------------------------------------------------------
+  void fail(const std::optional<const SemanticVersion>& value) noexcept
+  {
+    TEST(!static_cast<bool>(value));
+  }
+
+  //-------------------------------------------------------------------------
+  void test() noexcept(false)
+  {
+    expect(SemanticVersion::convert("1.0.0"sv), 1, 0, 0, ""sv, ""sv);
+    fail(SemanticVersion::convert("1.0"sv));
+    fail(SemanticVersion::convert(".1.0.0"sv));
+    fail(SemanticVersion::convert("1.0.0."sv));
+    fail(SemanticVersion::convert("1.0.0.0"sv));
+    fail(SemanticVersion::convert("1a.0.0"sv));
+    fail(SemanticVersion::convert("111111111111111111111111111111111111111111111111.0.0"sv));
+    fail(SemanticVersion::convert("1.-1.0"sv));
+    fail(SemanticVersion::convert("1.1..0"sv));
+    fail(SemanticVersion::convert("1.0.0.+alpha"sv));
+    fail(SemanticVersion::convert("1.0.0+"sv));
+    fail(SemanticVersion::convert("1.0.0-"sv));
+    fail(SemanticVersion::convert("1.0.0+-build"sv));
+    fail(SemanticVersion::convert("1.0.0-+build"sv));
+    fail(SemanticVersion::convert("1.0.0++build"sv));
+    fail(SemanticVersion::convert("1.0.0--build"sv));
+    fail(SemanticVersion::convert("1.0.11111111111111111111111111111111111111111111111111+build"sv));
+    fail(SemanticVersion::convert("1.0.11111111111111111111111111111111111111111111111111-build"sv));
+    fail(SemanticVersion::convert("1.0-build"sv));
+    fail(SemanticVersion::convert("1.0+build"sv));
+    fail(SemanticVersion::convert("1.0.0a"sv));
+    fail(SemanticVersion::convert("1.0.11111111111111111111111111111111111111111111111111"sv));
+
+    expect(SemanticVersion::convert("1.2.3"sv), 1, 2, 3, ""sv, ""sv);
+    expect(SemanticVersion::convert("1.2.3+alpha"sv), 1, 2, 3, ""sv, "alpha"sv);
+    expect(SemanticVersion::convert("1.2.3-alpha"sv), 1, 2, 3, "alpha"sv, ""sv);
+    expect(SemanticVersion::convert("1.2.3+alpha.beta"sv), 1, 2, 3, ""sv, "alpha.beta"sv);
+    expect(SemanticVersion::convert("1.2.3+11111111111111111111111111111111111111111111111111"sv), 1, 2, 3, ""sv, "11111111111111111111111111111111111111111111111111"sv);
+    expect(SemanticVersion::convert("1.2.3-11111111111111111111111111111111111111111111111111"sv), 1, 2, 3, "11111111111111111111111111111111111111111111111111"sv, ""sv);
+    expect(SemanticVersion::convert("1.2.3+beta-alpha"sv), 1, 2, 3, "alpha"sv, "beta"sv);
+    expect(SemanticVersion::convert("1.2.3-beta+alpha"sv), 1, 2, 3, "beta"sv, "alpha"sv);
+
+    output(__FILE__ "::" __FUNCTION__);
+  }
+
+
+  //-------------------------------------------------------------------------
+  void test2() noexcept(false)
+  {
+    TEST(SemanticVersion{ "1.0.0" } == SemanticVersion{ "1.0.0" });
+    TEST(SemanticVersion{ "1.0.0" } >= SemanticVersion{ "1.0.0" });
+    TEST(SemanticVersion{ "1.0.1" } >= SemanticVersion{ "1.0.0" });
+    TEST(SemanticVersion{ "1.0.0" } <= SemanticVersion{ "1.0.0" });
+    TEST(SemanticVersion{ "0.9.9999" } <= SemanticVersion{ "1.0.0" });
+    TEST(SemanticVersion{ "1.0.0" } > SemanticVersion{ "0.1.1" });
+    TEST(SemanticVersion{ "1.0.0" } > SemanticVersion{ "0.0.1" });
+    TEST(SemanticVersion{ "1.0.0" } > SemanticVersion{ "0.1.0" });
+    TEST(SemanticVersion{ "1.0.0" } < SemanticVersion{ "1.1.1" });
+    TEST(SemanticVersion{ "1.0.0" } < SemanticVersion{ "1.0.1" });
+    TEST(SemanticVersion{ "1.0.0" } < SemanticVersion{ "1.1.0" });
+    TEST(SemanticVersion{ "0.0.0" } < SemanticVersion{ "0.1.1" });
+    TEST(SemanticVersion{ "0.0.0" } < SemanticVersion{ "0.0.1" });
+    TEST(SemanticVersion{ "0.0.0" } < SemanticVersion{ "1.0.0" });
+    TEST(std::strong_ordering::equal == SemanticVersion{ "1.0.0" }.fullCompare(SemanticVersion{ "1.0.0" }));
+    TEST(std::strong_ordering::less == SemanticVersion{ "1.0.0-alpha" }.fullCompare(SemanticVersion{ "1.0.0-blpha" }));
+    TEST(std::strong_ordering::greater == SemanticVersion{ "1.0.0-blpha" }.fullCompare(SemanticVersion{ "1.0.0-alpha" }));
+    output(__FILE__ "::" __FUNCTION__);
+  }
+
+  //-------------------------------------------------------------------------
+  void runAll() noexcept(false)
+  {
+    auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
+
+    runner([&]() { test(); });
+    runner([&]() { test2(); });
+
+    reset();
+  }
+};
+
+//---------------------------------------------------------------------------
 void testHelpers() noexcept(false)
 {
   HelperBasics{}.runAll();
+  HelperSemanticVersion{}.runAll();
 }
 
 } // namespace zaxTest

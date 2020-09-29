@@ -113,4 +113,31 @@ String stringReplace(
 std::optional<int> toInt(const String& input) noexcept;
 std::optional<int> toInt(StringView input) noexcept;
 
+// see https://semver.org/
+// The rules are fully followed except the "pre-release" and "build" are
+// relaxed rules for strings that are not strict by the parse rules.
+struct SemanticVersion
+{
+  int major_{};
+  int minor_{};
+  int patch_{};
+  String preRelease_;
+  String build_;
+
+  SemanticVersion(StringView value, bool *outSuccess = nullptr) noexcept;
+
+  SemanticVersion() = default;
+  SemanticVersion(const SemanticVersion&) = default;
+  SemanticVersion(SemanticVersion&&) = default;
+
+  SemanticVersion& operator=(const SemanticVersion&) = default;
+  SemanticVersion& operator=(SemanticVersion&&) = default;
+
+  bool operator==(const SemanticVersion& op2) const noexcept { return std::strong_ordering::equivalent == (*this <=> op2); }
+  std::strong_ordering operator<=>(const SemanticVersion& op2) const noexcept;
+  std::strong_ordering fullCompare(const SemanticVersion& op2) const noexcept;
+
+  static std::optional<SemanticVersion> convert(const StringView value) noexcept;
+};
+
 } // namespace zax

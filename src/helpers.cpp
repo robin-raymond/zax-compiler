@@ -584,6 +584,8 @@ String zax::stringReplace(
 //-----------------------------------------------------------------------------
 std::optional<int> zax::toInt(const String& input) noexcept
 {
+  if (input.empty())
+    return {};
   try {
     // filter out decimals and exponents
     if (String::npos != input.find("."))
@@ -603,4 +605,210 @@ std::optional<int> zax::toInt(const String& input) noexcept
 std::optional<int> zax::toInt(StringView input) noexcept
 {
   return toInt(String{input});
+}
+
+namespace
+{
+  //---------------------------------------------------------------------------
+  std::strong_ordering ordering(const String& value1, const String& value2) noexcept
+  {
+    auto compare{ value1.compare(value2) };
+    if (compare < 0)
+      return std::strong_ordering::less;
+    if (compare > 0)
+      return std::strong_ordering::greater;
+    return std::strong_ordering::equal;
+  }
+} // namespace
+
+//-----------------------------------------------------------------------------
+SemanticVersion::SemanticVersion(StringView value, bool* outSuccess) noexcept
+{
+  if (outSuccess)
+    *outSuccess = false;
+  if (value.empty())
+    return;
+
+  static constexpr int maxVersions{ 3 };
+
+  int dotIndex{ 0 };
+  bool lastWasDot{};
+
+  StringView posNumber{};
+  StringView posPlus{};
+  StringView posMinus{};
+
+  bool foundPlus{};
+  bool foundMinus{};
+
+  auto pos{ value };
+
+  auto completePlus{ [&]() noexcept -> bool {
+    if (posPlus.empty())
+      return true;
+    build_ = makeStringView(posPlus.data() + 1, pos.data());
+    posPlus = {};
+    foundPlus = true;
+    return !build_.empty();
+  } };
+
+  auto completeMinus{ [&]() noexcept -> bool {
+    if (posMinus.empty())
+      return true;
+    preRelease_ = makeStringView(posMinus.data() + 1, pos.data());
+    posMinus = {};
+    foundMinus = true;
+    return !preRelease_.empty();
+  } };
+
+  auto completeNumber{ [&]() noexcept -> bool {
+      if (posNumber.empty())
+        return true;
+
+      auto asNumber{ toInt(makeStringView(posNumber.data(), pos.data())) };
+      if (!asNumber)
+        return false;
+
+      if (*asNumber < 0)
+        return false;
+
+      switch (dotIndex) {
+        case 0: major_ = *asNumber; break;
+        case 1: minor_ = *asNumber; break;
+        case 2: patch_ = *asNumber; break;
+        default: return false;
+      }
+      ++dotIndex;
+      posNumber = {};
+      return true;
+  } };
+
+  auto foundStrayChar{ [&]() noexcept -> bool {
+    if (dotIndex < maxVersions)
+      return false;
+    return ((posMinus.empty()) && (posPlus.empty()));
+  } };
+
+  while (!pos.empty())
+  {
+    char chr{ *pos.data() };
+
+    switch (chr) {
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9': {
+        if (foundStrayChar())
+          return;
+        if (dotIndex >= maxVersions)
+          break;
+        if (posNumber.empty())
+          posNumber = pos;
+        lastWasDot = false;
+        break;
+      }
+      case '.': {
+        if (foundStrayChar())
+          return;
+        if (dotIndex >= maxVersions)
+          break;
+        if (dotIndex + 1 == maxVersions)
+          return;
+
+        if (lastWasDot)
+          return;
+
+        if (posNumber.empty())
+          return;
+
+        if (!completeNumber())
+          return;
+
+        lastWasDot = true;
+        break;
+      }
+      case '+': {
+        if (!completeNumber())
+          return;
+        if (dotIndex < maxVersions)
+          return;
+        if ((foundPlus) || (!posPlus.empty()))
+          return;
+        if (!completeMinus())
+          return;
+        posPlus = pos;
+        break;
+      }
+      case '-': {
+        if (!completeNumber())
+          return;
+        if (dotIndex < maxVersions)
+          return;
+        if ((foundMinus) || (!posMinus.empty()))
+          return;
+        if (!completePlus())
+          return;
+        posMinus = pos;
+        break;
+      }
+      default: {
+        if (dotIndex < maxVersions)
+          return;
+        if (foundStrayChar())
+          return;
+        break;
+      }
+    }
+
+    pos = pos.substr(1);
+  }
+
+  if (lastWasDot)
+    return;
+  if (!completeNumber())
+    return;
+  if (!completePlus())
+    return;
+  if (!completeMinus())
+    return;
+
+  if (dotIndex < maxVersions)
+    return;
+
+  if (outSuccess)
+    *outSuccess = true;
+}
+
+//-----------------------------------------------------------------------------
+std::strong_ordering SemanticVersion::operator<=>(const SemanticVersion& op2) const noexcept
+{
+  { auto check{ major_ <=> op2.major_ }; if (std::strong_ordering::equal != check) return check; }
+  { auto check{ minor_ <=> op2.minor_ }; if (std::strong_ordering::equal != check) return check; }
+  { auto check{ patch_ <=> op2.patch_ }; if (std::strong_ordering::equal != check) return check; }
+  return std::strong_ordering::equivalent;
+}
+
+//-----------------------------------------------------------------------------
+std::strong_ordering SemanticVersion::fullCompare(const SemanticVersion& op2) const noexcept
+{
+  { auto check{ *this <=> op2 }; if (std::strong_ordering::equivalent != check) return check; }
+  { auto check{ ordering(preRelease_, op2.preRelease_) }; if (std::strong_ordering::equal != check) return check; }
+  { auto check{ ordering(build_, op2.build_) }; if (std::strong_ordering::equal != check) return check; }
+  return std::strong_ordering::equal;
+}
+
+//-----------------------------------------------------------------------------
+std::optional<SemanticVersion> SemanticVersion::convert(const StringView value) noexcept
+{
+  bool success{};
+  SemanticVersion result{ value, &success };
+  if (!success)
+    return {};
+  return result;
 }
