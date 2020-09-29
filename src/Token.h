@@ -73,6 +73,7 @@ struct TokenTypes
     Equals,
     NotEquals,
     ThreeWayCompare,
+    Swap,
     LessThan,
     GreaterThan,
     LessThanEquals,
@@ -146,7 +147,7 @@ struct TokenTypes
   };
 
   
-  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 102>
+  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 103>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -185,6 +186,7 @@ struct TokenTypes
         { Operator::Equals, "==" },
         { Operator::NotEquals, "!=" },
         { Operator::ThreeWayCompare, "<=>" },
+        { Operator::Swap, "<<>>" },
         { Operator::LessThan, "<" },
         { Operator::GreaterThan, ">" },
         { Operator::LessThanEquals, "<=" },
