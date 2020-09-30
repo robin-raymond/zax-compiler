@@ -163,10 +163,11 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 
     // scope: check will extract function
     {
+      auto errorToken{ *startIter ? *startIter : *literal->literalIter_ };
       auto extraction{ extract(context, startIter, iter) };
       auto check{ functions.extractedValueFunc_ && functions.extractedValueFunc_(primary, literal->literalIter_, literal->name_, extraction) };
       if ((!check) && (!isUnknownExtension(literal->name_))) {
-        out(Warning::DirectiveNotUnderstood, *literal->literalIter_);
+        out(Warning::DirectiveNotUnderstood, errorToken);
         understood = false;
         break;
       }
@@ -1193,6 +1194,36 @@ bool Parser::consumeDeprecateDirective(Context& context, Tokenizer::iterator ite
     }
     return false;
   };
+
+
+  functions.extractedValueFunc_ = [&optionNotSetOrNever, &min, &max](bool primary, Tokenizer::iterator foundAt, StringView name, ParserTypes::Extraction& value) noexcept -> bool {
+    if (primary)
+      return false;
+
+    if (optionNotSetOrNever())
+      return false;
+    
+
+    if ("min"sv == name) {
+      if (min.has_value())
+        return false;
+#define RESOLVE_DEPRECATE_MIN_NOW 1
+#define RESOLVE_DEPRECATE_MIN_NOW 2
+
+      return true;
+    }
+    if ("max"sv == name) {
+      if (max.has_value())
+        return false;
+
+#define RESOLVE_DEPRECATE_MAX_NOW 1
+#define RESOLVE_DEPRECATE_MAX_NOW 2
+
+      return true;
+    }
+    return false;
+  };
+
 
   auto directive{ parseDirective(context, iter, functions) };
   assert(directive);

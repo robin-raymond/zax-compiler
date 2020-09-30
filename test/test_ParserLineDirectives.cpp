@@ -401,7 +401,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/source/h.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 47 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 56 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 23 - 8 + 1);
 
     testCommon(example,
@@ -433,7 +433,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
     config.inputFilePaths_.emplace_back(example1);
     auto parser{ std::make_shared<Parser>(config, callbacks()) };
 
-    error(Warning::DirectiveNotUnderstood, example1, 2, 46 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example1, 2, 55 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example1, 3, 23 - 8 + 1);
 
     parser->parse();
@@ -826,7 +826,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/source/v.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 30 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 39 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 3);
 
     testCommon(example,
@@ -840,7 +840,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/source/va.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 30 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 39 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
 
     testCommon(example,
@@ -884,7 +884,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/source/x.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 38 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
 
     testCommon(example,
@@ -898,7 +898,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/source/x.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 43 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 53 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
 
     testCommon(example,
@@ -912,7 +912,7 @@ struct ParserSourceAssetDirectives : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/source/x.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 29 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 39 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 1);
 
     testCommon(example,
@@ -1201,7 +1201,7 @@ struct ParserLineAssignDirective : public ParserCommon
   {
     const std::string_view example{ "ignored/testing/parser/directive/line-assign/1c.zax" };
 
-    error(Warning::DirectiveNotUnderstood, example, 2, 32 - 8 + 1);
+    error(Warning::DirectiveNotUnderstood, example, 2, 42 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 47 - 8 + 1);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
     expect(Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
