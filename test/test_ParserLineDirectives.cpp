@@ -3337,6 +3337,9 @@ struct ParserDeprecateDirective : public ParserCommon
         "\t;\n"
         "\t;\n"
       );
+      deprecate(0, CsContext::Import, false, ""sv, ""sv);
+      noDeprecate(1);
+      deprecate(2, CsContext::Import, false, ""sv, ""sv);
       reset();
     }
     {
@@ -3646,6 +3649,199 @@ struct ParserDeprecateDirective : public ParserCommon
 };
 
 //---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+struct ParserExportDirective : public ParserCommon
+{
+  using CsContext = CompileState::Deprecate::Context;
+
+  void visible(size_t index) noexcept(false)
+  {
+    TEST(faultTokenState(index)->export_.visible());
+  }
+
+  void hidden(size_t index) noexcept(false)
+  {
+    TEST(faultTokenState(index)->export_.hidden());
+  }
+
+  //-------------------------------------------------------------------------
+  void test1() noexcept(false)
+  {
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1a.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n");
+
+      hidden(0);
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1b.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 5, 9);
+      testCommon(example,
+        "\n"
+        "[[export=never]]\n"
+        "\t;\n"
+        "[[export=always]]\n"
+        "\t;\n"
+      );
+
+      hidden(0);
+      visible(1);
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1c.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 5, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      testCommon(example,
+        "\n"
+        "[[export=no]]\n"
+        "\t;\n"
+        "[[export=yes]]\\\n"
+        "\t;\n"
+        "\t;\n"
+      );
+
+      hidden(0);
+      visible(1);
+      hidden(2);
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1d.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 5, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      testCommon(example,
+        "\n"
+        "[[export=no]]\n"
+        "\t;\n"
+        "[[export]]\\\n"
+        "\t;\n"
+        "\t;\n"
+      );
+
+      hidden(0);
+      visible(1);
+      hidden(2);
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1e.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 5, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      testCommon(example,
+        "\n"
+        "[[export=always]]\n"
+        "\t;\n"
+        "[[export=no]]\\\n"
+        "\t;\n"
+        "\t;\n"
+      );
+      visible(0);
+      hidden(1);
+      visible(2);
+      reset();
+    }
+
+    output(__FILE__ "::" __FUNCTION__);
+  }
+
+  //-------------------------------------------------------------------------
+  void test2() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/directive/export/2.zax" };
+
+    error(Warning::DirectiveNotUnderstood, example, 2, 3);
+    expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[export='hello']]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test3() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/directive/export/3.zax" };
+
+    error(Warning::UnknownDirectiveArgument, example, 2, 23 - 8 + 1);
+    expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[export=never,min='hello']]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test4() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/directive/export/4.zax" };
+
+    error(Warning::DirectiveNotUnderstood, example, 2, 17 - 8 + 1);
+    expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[export=whatever]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test5() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/directive/export/5.zax" };
+
+    error(Warning::UnknownDirectiveArgument, example, 2, 23 - 8 + 1);
+    expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[export=never,error]]\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void test6() noexcept(false)
+  {
+    const std::string_view example{ "ignored/testing/parser/directive/export/6.zax" };
+
+    error(Warning::UnknownDirectiveArgument, example, 2, 20 - 8 + 1);
+    expect(Warning::StatementSeparatorOperatorRedundant, example, 3, 9);
+
+    testCommon(example,
+      "\n"
+      "[[export=no,error]]\\\n"
+      "\t;\n");
+  }
+
+  //-------------------------------------------------------------------------
+  void runAll() noexcept(false)
+  {
+    auto runner{ [&](auto&& func) noexcept(false) { reset(); func(); } };
+
+    runner([&]() { test1(); });
+    runner([&]() { test2(); });
+    runner([&]() { test3(); });
+    runner([&]() { test4(); });
+    runner([&]() { test5(); });
+    runner([&]() { test6(); });
+
+    reset();
+  }
+};
+
+//---------------------------------------------------------------------------
 void testParserLineDirectives() noexcept(false)
 {
   ParserSourceAssetDirectives{}.runAll();
@@ -3659,6 +3855,7 @@ void testParserLineDirectives() noexcept(false)
   ParserTypesDirective{}.runAll();
   ParserVariablesDirective{}.runAll();
   ParserDeprecateDirective{}.runAll();
+  ParserExportDirective{}.runAll();
 }
 
 } // namespace zaxTest

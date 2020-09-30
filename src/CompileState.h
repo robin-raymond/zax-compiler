@@ -81,6 +81,14 @@ struct CompileState
   };
   std::optional<Deprecate> deprecate_;
 
+  struct Export
+  {
+    bool export_{};
+
+    bool visible() const noexcept { return export_; }
+    bool hidden() const noexcept { return !export_; }
+  } export_;
+
   bool isWarningAnError(WarningTypes::Warning warning) const noexcept;
 
   static CompileStatePtr fork(const CompileStateConstPtr& original) noexcept;

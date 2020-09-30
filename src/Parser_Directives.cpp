@@ -297,6 +297,8 @@ bool Parser::consumeLineParserDirective(Context& context) noexcept
     return consumeVariablesDirective(context, iter);
   if ("deprecate"sv == primaryLiteral->name_)
     return consumeDeprecateDirective(context, iter);
+  if ("export"sv == primaryLiteral->name_)
+    return consumeExportDirective(context, iter);
 
   return false;
 }
@@ -1215,6 +1217,54 @@ bool Parser::consumeDeprecateDirective(Context& context, Tokenizer::iterator ite
     }
     else
       tempState->deprecate_.reset();
+    if (!singleLineState)
+      context.state_ = tempState;
+    else
+      context.singleLineState_ = tempState;
+    applyToSources(context, tempState, singleLineState);
+  }
+  (void)consumeTo(directive->afterIter_);
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::consumeExportDirective(Context& context, Tokenizer::iterator iter) noexcept
+{
+  std::optional<YesNoAlwaysNever> option{};
+
+  ParseDirectiveFunctions functions;
+
+  functions.legalName_ = [](bool primary, StringView name) noexcept -> bool {
+    return primary;
+  };
+
+  functions.noValueFunc_ = [&option](bool primary, Tokenizer::iterator foundAt, StringView name) noexcept -> bool {
+    if (!primary)
+      return false;
+    option = YesNoAlwaysNever::Yes;
+    return true;
+  };
+
+  functions.literalValueFunc_ = [&option](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+    if (!primary)
+      return false;
+    option = YesNoAlwaysNeverTraits::toEnum(value);
+    return static_cast<bool>(option);
+  };
+
+  auto directive{ parseDirective(context, iter, functions) };
+  assert(directive);
+  if (directive->success_) {
+    bool singleLineState{ false };
+    bool yes{};
+    auto tempState{ CompileState::fork(context.state()) };
+    switch (*option) {
+      case YesNoAlwaysNever::Yes:     yes = singleLineState = true; break;
+      case YesNoAlwaysNever::No:      yes = false;  singleLineState = true; break;
+      case YesNoAlwaysNever::Always:  yes = true; break;
+      case YesNoAlwaysNever::Never:   yes = false; break;
+    }
+    tempState->export_.export_ = yes;
     if (!singleLineState)
       context.state_ = tempState;
     else

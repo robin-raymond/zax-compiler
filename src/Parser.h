@@ -60,6 +60,7 @@ struct Parser : public ParserTypes,
   [[nodiscard]] bool consumeWarningDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeErrorDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeDeprecateDirective(Context& context, Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] bool consumeExportDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeVariablesDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeTypesDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeFunctionsDirective(Context& context, Tokenizer::iterator iter) noexcept;

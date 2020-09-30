@@ -186,6 +186,15 @@ struct ParserDirectiveTypes
     std::function<bool(bool, Tokenizer::iterator, StringView, StringView)> numberValueFunc_;
     std::function<bool(bool, Tokenizer::iterator, StringView, ParserTypes::Extraction&)> extractedValueFunc_;
   };
+
+  struct Descope
+  {
+    TokenConstPtr literal_;
+  };
+  struct Discard
+  {
+    TokenConstPtr literal_;
+  };
 };
 
 //-----------------------------------------------------------------------------
