@@ -24,6 +24,7 @@ struct TokenizerTypes
     int utf8Count_{};
 
     int lineSkip_{ 1 };
+    int tabStopWidth_{ 8 };
 
     bool operator==(const ParserPos& rhs) const noexcept;
     bool sameLocation(const ParserPos& rhs) const noexcept;
@@ -112,17 +113,17 @@ public:
     TokenList&& tokenList) noexcept;
   ~Tokenizer() noexcept;
 
-  static void count(const CompileState& state, ParserPos& parserPos, char let) noexcept;
-  static void advance(const CompileState& state, ParserPos& parserPos, StringView str) noexcept                { advance(state, parserPos, str.length()); }
-  static void advance(const CompileState& state, ParserPos& parserPos, size_t length) noexcept                 { parserPos.location_.column_ += SafeInt<decltype(parserPos.location_.column_)>(length); }
+  static void count(ParserPos& parserPos, char let) noexcept;
+  static void advance(ParserPos& parserPos, StringView str) noexcept                { advance(parserPos, str.length()); }
+  static void advance(ParserPos& parserPos, size_t length) noexcept                 { parserPos.location_.column_ += SafeInt<decltype(parserPos.location_.column_)>(length); }
   static bool consumeUtf8Bom(ParserPos& parserPos) noexcept;
-  [[nodiscard]] static optional<CommentToken> consumeComment(const CompileState& state, ParserPos& parserPos) noexcept;
-  [[nodiscard]] static optional<WhitespaceToken> consumeWhitespace(const CompileState& state, ParserPos& parserPos) noexcept;
-  [[nodiscard]] static optional<QuoteToken> consumeQuote(const CompileState& state, ParserPos& parserPos) noexcept;
-  [[nodiscard]] static optional<LiteralToken> consumeLiteral(const CompileState& state, ParserPos& parserPos) noexcept;
-  [[nodiscard]] static optional<NumericToken> consumeNumeric(const CompileState& state, ParserPos& parserPos) noexcept;
+  [[nodiscard]] static optional<CommentToken> consumeComment(ParserPos& parserPos) noexcept;
+  [[nodiscard]] static optional<WhitespaceToken> consumeWhitespace(ParserPos& parserPos) noexcept;
+  [[nodiscard]] static optional<QuoteToken> consumeQuote(ParserPos& parserPos) noexcept;
+  [[nodiscard]] static optional<LiteralToken> consumeLiteral(ParserPos& parserPos) noexcept;
+  [[nodiscard]] static optional<NumericToken> consumeNumeric(ParserPos& parserPos) noexcept;
   [[nodiscard]] static optional<OperatorToken> consumeOperator(const OperatorLut& lut, ParserPos& parserPos) noexcept;
-  [[nodiscard]] static optional<IllegalToken> consumeKnownIllegalToken(const CompileState& state, ParserPos& parserPos) noexcept;
+  [[nodiscard]] static optional<IllegalToken> consumeKnownIllegalToken(ParserPos& parserPos) noexcept;
 
 public:
   template <typename TList>

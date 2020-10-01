@@ -2828,7 +2828,7 @@ struct ParserFunctionsDirective : public ParserCommon
         "\n"
         "\t;\n");
 
-      TEST(faultTokenState(0)->functionDefault_.inconstant());
+      TEST(faultTokenState(0)->functionDefaults_.inconstant());
       reset();
     }
     {
@@ -2839,7 +2839,7 @@ struct ParserFunctionsDirective : public ParserCommon
         "[[functions=constant]]\n"
         "\t;\n");
 
-      TEST(faultTokenState(0)->functionDefault_.constant());
+      TEST(faultTokenState(0)->functionDefaults_.constant());
       reset();
     }
     {
@@ -2850,7 +2850,49 @@ struct ParserFunctionsDirective : public ParserCommon
         "[[functions=inconstant]]\n"
         "\t;\n");
 
-      TEST(faultTokenState(0)->functionDefault_.inconstant());
+      TEST(faultTokenState(0)->functionDefaults_.inconstant());
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/functions/1d.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 5, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 7, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n"
+        "[[functions=push]]\n"
+        "[[functions=constant]]\n"
+        "\t;\n"
+        "[[functions=pop]]\n"
+        "\t;\n"
+      );
+
+      TEST(faultTokenState(0)->functionDefaults_.inconstant());
+      TEST(faultTokenState(1)->functionDefaults_.constant());
+      TEST(faultTokenState(2)->functionDefaults_.inconstant());
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/functions/1e.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 5, 9);
+      expect(Error::UnmatchedPush, example, 7, 3);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 8, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n"
+        "[[functions=push]]\n"
+        "[[functions=constant]]\n"
+        "\t;\n"
+        "[[functions=pop]]\n"
+        "[[functions=pop]]\n"
+        "\t;\n"
+      );
+
+      TEST(faultTokenState(0)->functionDefaults_.inconstant());
+      TEST(faultTokenState(1)->functionDefaults_.constant());
+      TEST(faultTokenState(2)->functionDefaults_.inconstant());
       reset();
     }
     output(__FILE__ "::" __FUNCTION__);
@@ -2943,8 +2985,8 @@ struct ParserTypesDirective : public ParserCommon
         "\n"
         "\t;\n");
 
-      TEST(faultTokenState(0)->typeDefault_._mutable());
-      TEST(faultTokenState(0)->typeDefault_.inconstant());
+      TEST(faultTokenState(0)->typeDefaults_._mutable());
+      TEST(faultTokenState(0)->typeDefaults_.inconstant());
       reset();
     }
     {
@@ -2959,11 +3001,11 @@ struct ParserTypesDirective : public ParserCommon
         "\t;\n"
       );
 
-      TEST(faultTokenState(0)->typeDefault_._mutable());
-      TEST(faultTokenState(0)->typeDefault_.inconstant());
+      TEST(faultTokenState(0)->typeDefaults_._mutable());
+      TEST(faultTokenState(0)->typeDefaults_.inconstant());
 
-      TEST(faultTokenState(1)->typeDefault_._mutable());
-      TEST(faultTokenState(1)->typeDefault_.constant());
+      TEST(faultTokenState(1)->typeDefaults_._mutable());
+      TEST(faultTokenState(1)->typeDefaults_.constant());
       reset();
     }
     {
@@ -2978,11 +3020,65 @@ struct ParserTypesDirective : public ParserCommon
         "\t;\n"
       );
 
-      TEST(faultTokenState(0)->typeDefault_._mutable());
-      TEST(faultTokenState(0)->typeDefault_.inconstant());
+      TEST(faultTokenState(0)->typeDefaults_._mutable());
+      TEST(faultTokenState(0)->typeDefaults_.inconstant());
 
-      TEST(faultTokenState(1)->typeDefault_.immutable());
-      TEST(faultTokenState(1)->typeDefault_.inconstant());
+      TEST(faultTokenState(1)->typeDefaults_.immutable());
+      TEST(faultTokenState(1)->typeDefaults_.inconstant());
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/types/1d.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 8, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n"
+        "[[types=push]]\n"
+        "[[types=constant]]\n"
+        "[[types=immutable]]\n"
+        "\t;\n"
+        "[[types=pop]]\n"
+        "\t;\n"
+      );
+
+      TEST(faultTokenState(0)->typeDefaults_._mutable());
+      TEST(faultTokenState(0)->typeDefaults_.inconstant());
+
+      TEST(faultTokenState(1)->typeDefaults_.immutable());
+      TEST(faultTokenState(1)->typeDefaults_.constant());
+
+      TEST(faultTokenState(2)->typeDefaults_._mutable());
+      TEST(faultTokenState(2)->typeDefaults_.inconstant());
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/types/1e.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      expect(Error::UnmatchedPush, example, 8, 3);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 9, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n"
+        "[[types=push]]\n"
+        "[[types=constant]]\n"
+        "[[types=immutable]]\n"
+        "\t;\n"
+        "[[types=pop]]\n"
+        "[[types=pop]]\n"
+        "\t;\n"
+      );
+
+      TEST(faultTokenState(0)->typeDefaults_._mutable());
+      TEST(faultTokenState(0)->typeDefaults_.inconstant());
+
+      TEST(faultTokenState(1)->typeDefaults_.immutable());
+      TEST(faultTokenState(1)->typeDefaults_.constant());
+
+      TEST(faultTokenState(2)->typeDefaults_._mutable());
+      TEST(faultTokenState(2)->typeDefaults_.inconstant());
       reset();
     }
 
@@ -3076,8 +3172,8 @@ struct ParserVariablesDirective : public ParserCommon
         "\n"
         "\t;\n");
 
-      TEST(faultTokenState(0)->variableDefault_._mutable());
-      TEST(faultTokenState(0)->variableDefault_.varies());
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
       reset();
     }
     {
@@ -3092,11 +3188,11 @@ struct ParserVariablesDirective : public ParserCommon
         "\t;\n"
       );
 
-      TEST(faultTokenState(0)->variableDefault_._mutable());
-      TEST(faultTokenState(0)->variableDefault_.varies());
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
 
-      TEST(faultTokenState(1)->variableDefault_._mutable());
-      TEST(faultTokenState(1)->variableDefault_._final());
+      TEST(faultTokenState(1)->variableDefaults_._mutable());
+      TEST(faultTokenState(1)->variableDefaults_._final());
       reset();
     }
     {
@@ -3111,11 +3207,65 @@ struct ParserVariablesDirective : public ParserCommon
         "\t;\n"
       );
 
-      TEST(faultTokenState(0)->variableDefault_._mutable());
-      TEST(faultTokenState(0)->variableDefault_.varies());
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
 
-      TEST(faultTokenState(1)->variableDefault_.immutable());
-      TEST(faultTokenState(1)->variableDefault_.varies());
+      TEST(faultTokenState(1)->variableDefaults_.immutable());
+      TEST(faultTokenState(1)->variableDefaults_.varies());
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/variables/1d.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 8, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n"
+        "[[variables=push]]\n"
+        "[[variables=final]]\n"
+        "[[variables=immutable]]\n"
+        "\t;\n"
+        "[[variables=pop]]\n"
+        "\t;\n"
+      );
+
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
+
+      TEST(faultTokenState(1)->variableDefaults_.immutable());
+      TEST(faultTokenState(1)->variableDefaults_._final());
+
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/variables/1e.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 2, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      expect(Error::UnmatchedPush, example, 8, 3);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 9, 9);
+      testCommon(example,
+        "\n"
+        "\t;\n"
+        "[[variables=push]]\n"
+        "[[variables=final]]\n"
+        "[[variables=immutable]]\n"
+        "\t;\n"
+        "[[variables=pop]]\n"
+        "[[variables=pop]]\n"
+        "\t;\n"
+      );
+
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
+
+      TEST(faultTokenState(1)->variableDefaults_.immutable());
+      TEST(faultTokenState(1)->variableDefaults_._final());
+
+      TEST(faultTokenState(0)->variableDefaults_._mutable());
+      TEST(faultTokenState(0)->variableDefaults_.varies());
       reset();
     }
 
@@ -3749,6 +3899,46 @@ struct ParserExportDirective : public ParserCommon
       visible(0);
       hidden(1);
       visible(2);
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1f.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 6, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 7, 9);
+      testCommon(example,
+        "\n"
+        "[[export=push]]\n"
+        "[[export=always]]\n"
+        "\t;\n"
+        "[[export=pop]]\n"
+        "\t;\n"
+        "\t;\n"
+      );
+      visible(0);
+      hidden(1);
+      hidden(2);
+      reset();
+    }
+    {
+      const std::string_view example{ "ignored/testing/parser/directive/export/1g.zax" };
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 4, 9);
+      expect(Error::UnmatchedPush, example, 6, 3);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 7, 9);
+      expect(Warning::StatementSeparatorOperatorRedundant, example, 8, 9);
+      testCommon(example,
+        "\n"
+        "[[export=push]]\n"
+        "[[export=always]]\n"
+        "\t;\n"
+        "[[export=pop]]\n"
+        "[[export=pop]]\n"
+        "\t;\n"
+        "\t;\n"
+      );
+      visible(0);
+      hidden(1);
+      hidden(2);
       reset();
     }
 

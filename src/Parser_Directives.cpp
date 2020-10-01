@@ -210,7 +210,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 }
 
 //-----------------------------------------------------------------------------
-std::optional<ParserDirectiveTypes::DirectiveLiteral> Parser::parseDirectiveLiteral(Tokenizer::iterator iter) noexcept
+std::optional<ParserDirectiveTypes::DirectiveLiteralResult> Parser::parseDirectiveLiteral(Tokenizer::iterator iter) noexcept
 {
   if (iter.isEnd())
     return {};
@@ -220,7 +220,7 @@ std::optional<ParserDirectiveTypes::DirectiveLiteral> Parser::parseDirectiveLite
 
   const OperatorLut& lut{ *iter.list().operatorLut_ };
 
-  Parser::DirectiveLiteral result;
+  DirectiveLiteralResult result;
   result.literalIter_ = iter;
   result.name_ = (*iter)->token_;
 
@@ -447,8 +447,8 @@ bool Parser::consumeTabStopDirective(Context& context, Tokenizer::iterator iter)
 
   assert(directive);
   if (directive->success_ && applyTabStop) {
-    context.state_ = CompileState::fork(context.state());
-    context.state_->tabStopWidth_ = *applyTabStop;
+    auto& tokenizer{ directive->openIter_.list() };
+    tokenizer.parserPos_.tabStopWidth_ = *applyTabStop;
   }
 
   (void)consumeTo(directive->afterIter_);
@@ -1043,54 +1043,6 @@ bool Parser::consumeErrorDirective(Context& context, Tokenizer::iterator iter) n
 }
 
 //-----------------------------------------------------------------------------
-void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
-{
-  if ((asset.unresolvedFile_.hasValue()) ||
-      (asset.unresolvedRename_.hasValue())) {
-#define TODO_RESOLVED_ASSET 1
-#define TODO_RESOLVED_ASSET 2
-    return;
-  }
-
-  SourceAsset newAsset;
-  newAsset.token_ = asset.token_;
-  newAsset.compileState_ = context.state();
-  newAsset.filePath_ = asset.file_;
-  newAsset.fullFilePath_ = asset.file_;
-  newAsset.required_ = asset.required_;
-  newAsset.renameFilePath_ = asset.rename_;
-  newAsset.generated_ = asset.generated_;
-
-  std::list<LocateWildCardFilesResult> results;
-  locateWildCardFiles(results, asset.token_->actualOrigin_.filePath_->filePath_, asset.file_);
-
-  if (results.size()) {
-    for (auto& located : results) {
-      newAsset.filePath_ = located.path_;
-      newAsset.fullFilePath_ = located.fullPath_;
-      newAsset.renameFilePath_ = asset.rename_;
-
-      String& replacingStr{ newAsset.renameFilePath_ };
-      bool failure{};
-      for (auto& match : located.foundMatches_) {
-        auto pos{ replacingStr.find_first_of("?*"sv) };
-        if (String::npos == pos) {
-          out(Error::OutputFailure, asset.token_, StringMap{ { "$file$", replacingStr } });
-          failure = true;
-          break;
-        }
-        replacingStr = replacingStr.substr(0, pos) + match + replacingStr.substr(pos + 1);
-      }
-      if (!failure)
-        pendingAssets_.push_front(newAsset);
-    }
-  }
-  else {
-    pendingAssets_.push_back(newAsset);
-  }
-}
-
-//-----------------------------------------------------------------------------
 bool Parser::consumeDeprecateDirective(Context& context, Tokenizer::iterator iter) noexcept
 {
   std::optional<YesNoAlwaysNever> option{};
@@ -1262,6 +1214,7 @@ bool Parser::consumeDeprecateDirective(Context& context, Tokenizer::iterator ite
 bool Parser::consumeExportDirective(Context& context, Tokenizer::iterator iter) noexcept
 {
   std::optional<YesNoAlwaysNever> option{};
+  std::optional<PushPop> pushOption{};
 
   ParseDirectiveFunctions functions;
 
@@ -1276,31 +1229,49 @@ bool Parser::consumeExportDirective(Context& context, Tokenizer::iterator iter) 
     return true;
   };
 
-  functions.literalValueFunc_ = [&option](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  functions.literalValueFunc_ = [&option, &pushOption](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     if (!primary)
       return false;
     option = YesNoAlwaysNeverTraits::toEnum(value);
-    return static_cast<bool>(option);
+    pushOption = PushPopTraits::toEnum(value);
+    return static_cast<bool>(option) || static_cast<bool>(pushOption);
   };
 
   auto directive{ parseDirective(context, iter, functions) };
   assert(directive);
   if (directive->success_) {
+    bool success{ true };
     bool singleLineState{ false };
-    bool yes{};
     auto tempState{ CompileState::fork(context.state()) };
-    switch (*option) {
-      case YesNoAlwaysNever::Yes:     yes = singleLineState = true; break;
-      case YesNoAlwaysNever::No:      yes = false;  singleLineState = true; break;
-      case YesNoAlwaysNever::Always:  yes = true; break;
-      case YesNoAlwaysNever::Never:   yes = false; break;
+    if (option) {
+      bool yes{};
+      switch (*option) {
+        case YesNoAlwaysNever::Yes:     yes = singleLineState = true; break;
+        case YesNoAlwaysNever::No:      yes = false;  singleLineState = true; break;
+        case YesNoAlwaysNever::Always:  yes = true; break;
+        case YesNoAlwaysNever::Never:   yes = false; break;
+      }
+      tempState->export_.export_ = yes;
     }
-    tempState->export_.export_ = yes;
-    if (!singleLineState)
-      context.state_ = tempState;
-    else
-      context.singleLineState_ = tempState;
-    applyToSources(context, tempState, singleLineState);
+    else {
+      switch (*pushOption) {
+        case PushPop::Push: tempState->pushExport(); break;
+        case PushPop::Pop: {
+          if (!tempState->popExport()) {
+            success = false;
+            out(Error::UnmatchedPush, *directive->literalIter_);
+          }
+          break;
+        }
+      }
+    }
+    if (success) {
+      if (!singleLineState)
+        context.state_ = tempState;
+      else
+        context.singleLineState_ = tempState;
+      applyToSources(context, tempState, singleLineState);
+    }
   }
   (void)consumeTo(directive->afterIter_);
   return true;
@@ -1332,6 +1303,7 @@ bool Parser::consumeVariablesDirective(Context& context, Tokenizer::iterator ite
   using VariablesDefaultTraits = zs::EnumTraits<VariablesDefault, VariablesDefaultDeclare>;
 
   std::optional<VariablesDefault> _default{};
+  std::optional<PushPop> pushOption{};
 
   ParseDirectiveFunctions functions;
 
@@ -1339,22 +1311,41 @@ bool Parser::consumeVariablesDirective(Context& context, Tokenizer::iterator ite
     return primary;
   };
 
-  functions.literalValueFunc_ = [&_default](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  functions.literalValueFunc_ = [&_default, &pushOption](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     _default = VariablesDefaultTraits::toEnum(value);
-    return static_cast<bool>(_default);
+    pushOption = PushPopTraits::toEnum(value);
+    return static_cast<bool>(_default) || static_cast<bool>(pushOption);
   };
 
   auto directive{ parseDirective(context, iter, functions) };
   assert(directive);
   if (directive->success_) {
-    context.state_ = CompileState::fork(context.state());
-    switch (*_default) {
-      case VariablesDefault::Mutable:     context.state_->variableDefault_.mutable_ = true; break;
-      case VariablesDefault::Immutable:   context.state_->variableDefault_.mutable_ = false; break;
-      case VariablesDefault::Varies:      context.state_->variableDefault_.varies_ = true; break;
-      case VariablesDefault::Final:       context.state_->variableDefault_.varies_ = false; break;
+    bool success{ true };
+    auto tempState{ CompileState::fork(context.state()) };
+    if (_default) {
+      switch (*_default) {
+        case VariablesDefault::Mutable:     tempState->variableDefaults_.mutable_ = true; break;
+        case VariablesDefault::Immutable:   tempState->variableDefaults_.mutable_ = false; break;
+        case VariablesDefault::Varies:      tempState->variableDefaults_.varies_ = true; break;
+        case VariablesDefault::Final:       tempState->variableDefaults_.varies_ = false; break;
+      }
     }
-    applyToSources(context, context.state_);
+    else {
+      switch (*pushOption) {
+        case PushPop::Push: tempState->pushVariableDefaults(); break;
+        case PushPop::Pop: {
+          if (!tempState->popVariableDefaults()) {
+            success = false;
+            out(Error::UnmatchedPush, *directive->literalIter_);
+          }
+          break;
+        }
+      }
+    }
+    if (success) {
+      context.state_ = tempState;
+      applyToSources(context, tempState);
+    }
   }
   (void)consumeTo(directive->afterIter_);
   return true;
@@ -1386,6 +1377,7 @@ bool Parser::consumeTypesDirective(Context& context, Tokenizer::iterator iter) n
   using TypesDefaultTraits = zs::EnumTraits<TypesDefault, TypesDefaultDeclare>;
 
   std::optional<TypesDefault> _default{};
+  std::optional<PushPop> pushOption{};
 
   ParseDirectiveFunctions functions;
 
@@ -1393,22 +1385,41 @@ bool Parser::consumeTypesDirective(Context& context, Tokenizer::iterator iter) n
     return primary;
   };
 
-  functions.literalValueFunc_ = [&_default](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  functions.literalValueFunc_ = [&_default, &pushOption](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     _default = TypesDefaultTraits::toEnum(value);
-    return static_cast<bool>(_default);
+    pushOption = PushPopTraits::toEnum(value);
+    return static_cast<bool>(_default) || static_cast<bool>(pushOption);
   };
 
   auto directive{ parseDirective(context, iter, functions) };
   assert(directive);
   if (directive->success_) {
-    context.state_ = CompileState::fork(context.state());
-    switch (*_default) {
-      case TypesDefault::Mutable:     context.state_->typeDefault_.mutable_ = true; break;
-      case TypesDefault::Immutable:   context.state_->typeDefault_.mutable_ = false; break;
-      case TypesDefault::Constant:    context.state_->typeDefault_.constant_ = true; break;
-      case TypesDefault::Inconstant:  context.state_->typeDefault_.constant_ = false; break;
+    bool success{ true };
+    auto tempState{ CompileState::fork(context.state()) };
+    if (_default) {
+      switch (*_default) {
+        case TypesDefault::Mutable:     tempState->typeDefaults_.mutable_ = true; break;
+        case TypesDefault::Immutable:   tempState->typeDefaults_.mutable_ = false; break;
+        case TypesDefault::Constant:    tempState->typeDefaults_.constant_ = true; break;
+        case TypesDefault::Inconstant:  tempState->typeDefaults_.constant_ = false; break;
+      }
     }
-    applyToSources(context, context.state_);
+    else {
+      switch (*pushOption) {
+        case PushPop::Push: tempState->pushTypeDefaults(); break;
+        case PushPop::Pop: {
+          if (!tempState->popTypeDefaults()) {
+            success = false;
+            out(Error::UnmatchedPush, *directive->literalIter_);
+          }
+          break;
+        }
+      }
+    }
+    if (success) {
+      context.state_ = tempState;
+      applyToSources(context, tempState);
+    }
   }
   (void)consumeTo(directive->afterIter_);
   return true;
@@ -1436,6 +1447,7 @@ bool Parser::consumeFunctionsDirective(Context& context, Tokenizer::iterator ite
   using FunctionsDefaultTraits = zs::EnumTraits<FunctionsDefault, FunctionsDefaultDeclare>;
 
   std::optional<FunctionsDefault> _default{};
+  std::optional<PushPop> pushOption{};
 
   ParseDirectiveFunctions functions;
 
@@ -1443,20 +1455,88 @@ bool Parser::consumeFunctionsDirective(Context& context, Tokenizer::iterator ite
     return primary;
   };
 
-  functions.literalValueFunc_ = [& _default](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
+  functions.literalValueFunc_ = [& _default, &pushOption](bool primary, Tokenizer::iterator foundAt, StringView name, StringView value) noexcept -> bool {
     _default = FunctionsDefaultTraits::toEnum(value);
-    return static_cast<bool>(_default);
+    pushOption = PushPopTraits::toEnum(value);
+    return static_cast<bool>(_default) || static_cast<bool>(pushOption);
   };
 
   auto directive{ parseDirective(context, iter, functions) };
   assert(directive);
   if (directive->success_) {
-    context.state_ = CompileState::fork(context.state());
-    context.state_->functionDefault_.constant_ = (*_default) == FunctionsDefault::Constant;
-    applyToSources(context, context.state_);
+    bool success{ true };
+    auto tempState{ CompileState::fork(context.state()) };
+    if (_default) {
+      tempState->functionDefaults_.constant_ = (*_default) == FunctionsDefault::Constant;
+    }
+    else {
+      switch (*pushOption) {
+        case PushPop::Push: tempState->pushFunctionDefaults(); break;
+        case PushPop::Pop: {
+          if (!tempState->popFunctionDefaults()) {
+            success = false;
+            out(Error::UnmatchedPush, *directive->literalIter_);
+          }
+          break;
+        }
+      }
+    }
+    if (success) {
+      context.state_ = tempState;
+      applyToSources(context, tempState);
+    }
   }
   (void)consumeTo(directive->afterIter_);
   return true;
+}
+
+//-----------------------------------------------------------------------------
+void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
+{
+  if ((asset.unresolvedFile_.hasValue()) ||
+      (asset.unresolvedRename_.hasValue())) {
+#define TODO_RESOLVED_ASSET 1
+#define TODO_RESOLVED_ASSET 2
+    return;
+  }
+
+  SourceAsset newAsset;
+  newAsset.token_ = asset.token_;
+  newAsset.compileState_ = context.state();
+  newAsset.filePath_ = asset.file_;
+  newAsset.fullFilePath_ = asset.file_;
+  newAsset.required_ = asset.required_;
+  newAsset.renameFilePath_ = asset.rename_;
+  newAsset.generated_ = asset.generated_;
+  newAsset.parentTabStopWidth_ = context->parserPos_.tabStopWidth_;
+
+  std::list<LocateWildCardFilesResult> results;
+  locateWildCardFiles(results, asset.token_->actualOrigin_.filePath_->filePath_, asset.file_);
+
+  if (results.size()) {
+    for (auto& located : results) {
+      newAsset.filePath_ = located.path_;
+      newAsset.fullFilePath_ = located.fullPath_;
+      newAsset.renameFilePath_ = asset.rename_;
+
+      String& replacingStr{ newAsset.renameFilePath_ };
+      bool failure{};
+      for (auto& match : located.foundMatches_) {
+        auto pos{ replacingStr.find_first_of("?*"sv) };
+        if (String::npos == pos) {
+          out(Error::OutputFailure, asset.token_, StringMap{ { "$file$", replacingStr } });
+          failure = true;
+          break;
+        }
+        replacingStr = replacingStr.substr(0, pos) + match + replacingStr.substr(pos + 1);
+      }
+      if (!failure)
+        pendingAssets_.push_front(newAsset);
+    }
+  }
+  else {
+    pendingAssets_.push_back(newAsset);
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -1475,6 +1555,7 @@ void Parser::handleSource(Context& context, SourceAssetDirective& source) noexce
   newSource.fullFilePath_ = source.file_;
   newSource.required_ = source.required_;
   newSource.generated_ = source.generated_;
+  newSource.parentTabStopWidth_ = context->parserPos_.tabStopWidth_;
 
   std::list<LocateWildCardFilesResult> results;
   locateWildCardFiles(results, source.token_->actualOrigin_.filePath_->filePath_, source.file_);

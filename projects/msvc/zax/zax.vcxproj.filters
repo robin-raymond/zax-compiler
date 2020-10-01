@@ -63,6 +63,9 @@
     <ClCompile Include="..\..\..\test\test_ParserLineDirectives.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Type.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\test\common.h">
@@ -132,6 +135,12 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\ParserTypes.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Type.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\ParserDirectiveTypes.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

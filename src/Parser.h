@@ -3,14 +3,14 @@
 
 #include "types.h"
 #include "ParserTypes.h"
+#include "ParserDirectiveTypes.h"
 
 namespace zax
 {
 
 //-----------------------------------------------------------------------------
 struct Parser : public ParserTypes,
-                public ParserDirectiveTypes,
-                public ParserOtherTypes
+                public ParserDirectiveTypes
 {
   const Puid id_{ puid() };
   Config config_;
@@ -49,7 +49,7 @@ struct Parser : public ParserTypes,
     Context& context,
     Tokenizer::iterator iter,
     ParseDirectiveFunctions& functions) noexcept;
-  [[nodiscard]] static std::optional<DirectiveLiteral> parseDirectiveLiteral(Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] static std::optional<DirectiveLiteralResult> parseDirectiveLiteral(Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] bool consumeLineParserDirective(Context& context) noexcept;
   [[nodiscard]] bool consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator iter, bool isSource) noexcept;

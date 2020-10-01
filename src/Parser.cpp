@@ -59,7 +59,6 @@ void Parser::parse() noexcept
     rootContext_ = std::make_shared<Context>();
     rootContext_->thisWeak_ = rootContext_;
     rootContext_->state_ = std::make_shared<CompileState>();
-    rootContext_->state_->tabStopWidth_ = config_.tabStopWidth_;
     fixWarningDefault(rootContext_->state_->warnings_);
     rootContext_->owner_ = id_;
     rootContext_->parser_ = this;
@@ -448,6 +447,7 @@ void Parser::prime() noexcept
       }
       source.required_ = decltype(source.required_)::Yes;
       source.commandLine_ = true;
+      source.parentTabStopWidth_ = config_.tabStopWidth_;
       pendingSources_.push_back(source);
     }
     config_.inputFilePaths_.clear();
@@ -497,6 +497,7 @@ void Parser::prime() noexcept
       std::move(fileContents),
       operatorLut_,
       [context = source->context_] () noexcept -> CompileStateConstPtr { return context->state(); });
+    source->tokenizer_->parserPos_.tabStopWidth_ = pending.parentTabStopWidth_;
     source->tokenizer_->skipComments_ = true;
     source->tokenizer_->errorCallback_ = callbacks_.error_;
     source->tokenizer_->warningCallback_ = callbacks_.warning_;

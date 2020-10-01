@@ -16,7 +16,6 @@ struct CompileState
   Errors errors_;
   Panics panics_;
   Warnings warnings_;
-  int tabStopWidth_{ 8 };
 
   struct VariableDefaults
   {
@@ -28,9 +27,9 @@ struct CompileState
 
     inline bool _mutable() const { return mutable_; }
     inline bool immutable() const { return !mutable_; }
-  } variableDefault_;
+  } variableDefaults_;
 
-  struct TypeDefautls
+  struct TypeDefaults
   {
     bool mutable_{ true };
     bool constant_{ false };
@@ -40,7 +39,7 @@ struct CompileState
 
     inline bool constant() const { return constant_; }
     inline bool inconstant() const { return !constant_; }
-  } typeDefault_;
+  } typeDefaults_;
 
   struct FunctionDefaults
   {
@@ -48,7 +47,7 @@ struct CompileState
 
     inline bool constant() const { return constant_; }
     inline bool inconstant() const { return !constant_; }
-  } functionDefault_;
+  } functionDefaults_;
 
   struct Deprecate
   {
@@ -89,9 +88,27 @@ struct CompileState
     bool hidden() const noexcept { return !export_; }
   } export_;
 
+  std::stack<VariableDefaults> variableDefaultsStack_;
+  std::stack<TypeDefaults> typeDefaultsStack_;
+  std::stack<FunctionDefaults> functionDefaultsStack_;
+  std::stack<Export> exportStack_;
+
   bool isWarningAnError(WarningTypes::Warning warning) const noexcept;
 
   static CompileStatePtr fork(const CompileStateConstPtr& original) noexcept;
+
+  void pushVariableDefaults() noexcept { return variableDefaultsStack_.push(variableDefaults_); }
+  void pushTypeDefaults() noexcept { return typeDefaultsStack_.push(typeDefaults_); }
+  void pushFunctionDefaults() noexcept { return functionDefaultsStack_.push(functionDefaults_); }
+  void pushExport() noexcept { return exportStack_.push(export_); }
+
+  template <typename TType>
+  bool pop(std::stack<TType>& s, TType& original) noexcept { if (s.size() < 1) return false; original = s.top(); s.pop(); return true; }
+
+  bool popVariableDefaults() noexcept { return pop(variableDefaultsStack_, variableDefaults_); }
+  bool popTypeDefaults() noexcept { return pop(typeDefaultsStack_, typeDefaults_); }
+  bool popFunctionDefaults() noexcept { return pop(functionDefaultsStack_, functionDefaults_); }
+  bool popExport() noexcept { return pop(exportStack_, export_); }
 };
 
 } // namespace zax

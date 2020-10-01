@@ -35,6 +35,7 @@
     <ClCompile Include="..\..\..\src\Tokenizer.cpp" />
     <ClCompile Include="..\..\..\src\TokenList.cpp" />
     <ClCompile Include="..\..\..\src\CompilerException.cpp" />
+    <ClCompile Include="..\..\..\src\Type.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
     <ClCompile Include="..\..\..\test\test_ParserLineDirectives.cpp" />
@@ -56,12 +57,14 @@
     <ClInclude Include="..\..\..\src\Module.h" />
     <ClInclude Include="..\..\..\src\OperatorLut.h" />
     <ClInclude Include="..\..\..\src\Panics.h" />
+    <ClInclude Include="..\..\..\src\ParserDirectiveTypes.h" />
     <ClInclude Include="..\..\..\src\ParserTypes.h" />
     <ClInclude Include="..\..\..\src\pch.h" />
     <ClInclude Include="..\..\..\src\Source.h" />
     <ClInclude Include="..\..\..\src\Token.h" />
     <ClInclude Include="..\..\..\src\Tokenizer.h" />
     <ClInclude Include="..\..\..\src\TokenList.h" />
+    <ClInclude Include="..\..\..\src\Type.h" />
     <ClInclude Include="..\..\..\src\types.h" />
     <ClInclude Include="..\..\..\src\version.h" />
     <ClInclude Include="..\..\..\src\Warnings.h" />
