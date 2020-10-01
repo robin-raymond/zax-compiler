@@ -333,20 +333,20 @@ bool Parser::consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator
     if ("required"sv == name) {
       if (foundRequired)
         return false;
-      auto evalue { SourceAssetRequiredTraits::toEnum(value) };
-      if (!evalue)
+      auto enumValue { SourceAssetRequiredTraits::toEnum(value) };
+      if (!enumValue)
         return false;
-      asset.required_ = *evalue;
+      asset.required_ = *enumValue;
       foundRequired = true;
       return true;
     }
     if ("generated"sv == name) {
       if (foundGenerated)
         return false;
-      auto evalue{ YesNoTraits::toEnum(value) };
-      if (!evalue)
+      auto enumValue{ YesNoTraits::toEnum(value) };
+      if (!enumValue)
         return false;
-      asset.generated_ = *evalue == YesNo::Yes ? true : false;
+      asset.generated_ = *enumValue == YesNo::Yes ? true : false;
       foundGenerated = true;
       return true;
     }
