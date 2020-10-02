@@ -20,4 +20,5 @@
 #include "TokenList.h"
 #include "Type.h"
 #include "Union.h"
+#include "Variable.h"
 #include "Warnings.h"

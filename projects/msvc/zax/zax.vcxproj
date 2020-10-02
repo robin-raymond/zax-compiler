@@ -40,6 +40,7 @@
     <ClCompile Include="..\..\..\src\Type.cpp" />
     <ClCompile Include="..\..\..\src\TypeCommon.cpp" />
     <ClCompile Include="..\..\..\src\Union.cpp" />
+    <ClCompile Include="..\..\..\src\Variable.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
     <ClCompile Include="..\..\..\test\test_ParserLineDirectives.cpp" />
@@ -74,6 +75,7 @@
     <ClInclude Include="..\..\..\src\TypeCommon.h" />
     <ClInclude Include="..\..\..\src\types.h" />
     <ClInclude Include="..\..\..\src\Union.h" />
+    <ClInclude Include="..\..\..\src\Variable.h" />
     <ClInclude Include="..\..\..\src\version.h" />
     <ClInclude Include="..\..\..\src\Warnings.h" />
     <ClInclude Include="..\..\..\src\zax.h" />

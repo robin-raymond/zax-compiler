@@ -78,6 +78,9 @@
     <ClCompile Include="..\..\..\src\TypeCommon.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\Variable.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\test\common.h">
@@ -165,6 +168,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\TypeCommon.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Variable.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

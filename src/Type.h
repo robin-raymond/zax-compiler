@@ -17,6 +17,8 @@ struct TypeTypes
 struct Type : public TypeCommon,
               public TypeTypes
 {
+  String extensionOf_;
+  TypePtr extention_;
 
   struct Flag
   {
