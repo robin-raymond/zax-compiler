@@ -123,6 +123,46 @@ struct ParserDirectiveTypes
   using FaultOptionsTraits = zs::EnumTraits<FaultOptions, FaultOptionsDeclare>;
 
 
+  enum class Inline {
+    Maybe,
+    Always,
+    Descope,
+    Never
+  };
+  struct InlineDeclare final : public zs::EnumDeclare<Inline, 4>
+  {
+    constexpr const Entries operator()() const noexcept
+    {
+      return { {
+        {Inline::Maybe, "maybe"},
+        {Inline::Always, "always"},
+        {Inline::Descope, "descope"},
+        {Inline::Never, "never"}
+      } };
+    }
+  };
+
+  using InlineTraits = zs::EnumTraits<Inline, InlineDeclare>;
+
+  enum class Return {
+    Normal,
+    Never,
+    Interrupt
+  };
+  struct ReturnDeclare final : public zs::EnumDeclare<Return, 3>
+  {
+    constexpr const Entries operator()() const noexcept
+    {
+      return { {
+        {Return::Normal, "normal"},
+        {Return::Never, "never"},
+        {Return::Interrupt, "interrupt"}
+      } };
+    }
+  };
+
+  using ReturnTraits = zs::EnumTraits<Return, ReturnDeclare>;
+
   enum class ResolveOption {
     Trial,
     Lazy,

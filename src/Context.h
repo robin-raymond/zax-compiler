@@ -88,7 +88,7 @@ struct Context : public ContextTypes
   } aliasing_;
 
   struct Types {
-    std::map<String, TypeDefinePtr> types_;
+    std::map<String, TypePtr> types_;
   } types_;
 };
 

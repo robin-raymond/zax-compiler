@@ -19,7 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\Alias.cpp" />
     <ClCompile Include="..\..\..\src\Context.cpp" />
+    <ClCompile Include="..\..\..\src\FunctionType.cpp" />
     <ClCompile Include="..\..\..\src\Parser.cpp" />
     <ClCompile Include="..\..\..\src\CompilerState.cpp" />
     <ClCompile Include="..\..\..\src\Parser_Directives.cpp" />
@@ -36,6 +38,8 @@
     <ClCompile Include="..\..\..\src\TokenList.cpp" />
     <ClCompile Include="..\..\..\src\CompilerException.cpp" />
     <ClCompile Include="..\..\..\src\Type.cpp" />
+    <ClCompile Include="..\..\..\src\TypeCommon.cpp" />
+    <ClCompile Include="..\..\..\src\Union.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
     <ClCompile Include="..\..\..\test\test_ParserLineDirectives.cpp" />
@@ -45,6 +49,8 @@
     <ClCompile Include="..\..\..\test\test_TokenizerList.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\Alias.h" />
+    <ClInclude Include="..\..\..\src\FunctionType.h" />
     <ClInclude Include="..\..\..\src\Parser.h" />
     <ClInclude Include="..\..\..\src\CompilerException.h" />
     <ClInclude Include="..\..\..\src\CompileState.h" />
@@ -65,7 +71,9 @@
     <ClInclude Include="..\..\..\src\Tokenizer.h" />
     <ClInclude Include="..\..\..\src\TokenList.h" />
     <ClInclude Include="..\..\..\src\Type.h" />
+    <ClInclude Include="..\..\..\src\TypeCommon.h" />
     <ClInclude Include="..\..\..\src\types.h" />
+    <ClInclude Include="..\..\..\src\Union.h" />
     <ClInclude Include="..\..\..\src\version.h" />
     <ClInclude Include="..\..\..\src\Warnings.h" />
     <ClInclude Include="..\..\..\src\zax.h" />

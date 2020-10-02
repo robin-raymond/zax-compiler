@@ -1,10 +1,12 @@
 
 #include "types.h"
 #include "version.h"
+#include "Alias.h"
 #include "Config.h"
 #include "Context.h"
 #include "CompileState.h"
 #include "Errors.h"
+#include "FunctionType.h"
 #include "helpers.h"
 #include "Module.h"
 #include "OperatorLut.h"
@@ -17,4 +19,5 @@
 #include "Tokenizer.h"
 #include "TokenList.h"
 #include "Type.h"
+#include "Union.h"
 #include "Warnings.h"

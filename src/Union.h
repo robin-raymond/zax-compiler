@@ -9,23 +9,14 @@ namespace zax
 {
 
 //-----------------------------------------------------------------------------
-struct TypeTypes
+struct UnionTypes
 {
 };
 
 //-----------------------------------------------------------------------------
-struct Type : public TypeCommon,
-              public TypeTypes
+struct Union : public TypeCommon,
+               public UnionTypes
 {
-
-  struct Flag
-  {
-    bool enabled_{};
-    bool defaulted_{};
-  };
-  Flag mutable_{ .enabled_ = true };
-  Flag immutable_{ .enabled_ = true };
-  bool managed_{};
 };
 
 } // namespace zax
