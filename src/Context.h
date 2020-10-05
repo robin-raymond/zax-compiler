@@ -4,6 +4,8 @@
 #include "types.h"
 #include "helpers.h"
 
+#include "Token.h"
+
 namespace zax
 {
 
@@ -28,6 +30,8 @@ struct ContextTypes
   };
 
   using TypeTraits = zs::EnumTraits<Type, TypeDeclare>;
+
+  using Operator = TokenTypes::Operator;
 };
 
 struct Context : public ContextTypes
@@ -79,17 +83,22 @@ struct Context : public ContextTypes
   const Context* parent() const noexcept { alive_();  return parent_; }
 
   Parser& parser() noexcept { alive_(); assert(parser_); return *parser_; }
+  const Parser& parser() const noexcept { alive_(); assert(parser_); return *parser_; }
   Module& module() noexcept { alive_(); assert(module_); return *module_; }
+  const Module& module() const noexcept { alive_(); assert(module_); return *module_; }
 
   struct Aliasing
   {
-    std::map<String, String> keywords_;
-    std::map<String, String> operators_;
+    std::map<String, TokenConstPtr> keywords_;
+    std::map<String, TokenConstPtr> operators_;
   } aliasing_;
 
   struct Types {
     std::map<String, TypePtr> types_;
   } types_;
+
+  void aliasLookup(const Token& token) const noexcept;
+  void aliasLookup(const TokenConstPtr token) const noexcept { if (!token) return; aliasLookup(*token); }
 };
 
 } // namespace zax

@@ -571,10 +571,10 @@ struct ParserSourceAssetDirectives : public ParserCommon
     config.inputFilePaths_.emplace_back(example1);
     auto parser{ std::make_shared<Parser>(config, callbacks()) };
 
-    expect(Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dbop/many_food.txt" } });
-    expect(Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dbop/many_food.txt" } });
-    expect(Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dcop/many_food.txt" } });
-    expect(Error::OutputFailure, example1, 2, 3, StringMap{ { "$file$", "ignored/output/dcop/many_food.txt" } });
+    expect(Error::WildCharacterMismatch, example1, 2, 3, StringMap{ { "$wild$", "ignored/output/dbop/many_food.txt" } });
+    expect(Error::WildCharacterMismatch, example1, 2, 3, StringMap{ { "$wild$", "ignored/output/dbop/many_food.txt" } });
+    expect(Error::WildCharacterMismatch, example1, 2, 3, StringMap{ { "$wild$", "ignored/output/dcop/many_food.txt" } });
+    expect(Error::WildCharacterMismatch, example1, 2, 3, StringMap{ { "$wild$", "ignored/output/dcop/many_food.txt" } });
     expect(Warning::StatementSeparatorOperatorRedundant, example1, 3, 3);
 
     parser->parse();

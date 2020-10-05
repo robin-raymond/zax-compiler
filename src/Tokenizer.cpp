@@ -695,6 +695,7 @@ void Tokenizer::primeNext() noexcept
     token->type_ = TokenTypes::Type::Literal;
     token->originalToken_ = value->token_;
     token->token_ = value->token_;
+    token->keyword_ = TokenTypes::KeywordTraits::toEnum(token->token_);
     parsedTokens_.pushBack(token);
     return true;
   } };

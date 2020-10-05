@@ -22,6 +22,7 @@ void testOperatorLut() noexcept(false);
 void testTokenizer() noexcept(false);
 void testTokenList() noexcept(false);
 void testParserLineDirectives() noexcept(false);
+void testParserAlias() noexcept(false);
 
 void output(StringView testName) noexcept;
 

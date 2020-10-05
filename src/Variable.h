@@ -4,7 +4,7 @@
 #include "types.h"
 
 #include "Token.h"
-#include "TypeCommon.h"
+#include "EntryCommon.h"
 
 namespace zax
 {
@@ -16,10 +16,9 @@ struct VariableTypes
 };
 
 //-----------------------------------------------------------------------------
-struct Variable : public VariableTypes
+struct Variable : public EntryCommon,
+                  public VariableTypes
 {
-  String name_;
-
   bool discard_{};
   bool once_{};
   bool private_{};
@@ -31,7 +30,7 @@ struct Variable : public VariableTypes
   bool operator_{};
   Operator whichOperator_{};
 
-  AliasPtr type_;
+  AliasPtr typeAlias_;
 };
 
 } // namespace zax

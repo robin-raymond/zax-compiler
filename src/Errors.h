@@ -59,10 +59,11 @@ struct ErrorTypes
     Syntax,
     OutputFailure,
     ExplicitLeaseCannotReceiveLast,
-    ExplicitCopyCannotReceiveMove
+    ExplicitCopyCannotReceiveMove,
+    KeywordAliasAlreadyDefined
   };
 
-  struct ErrorDeclare final : public zs::EnumDeclare<Error, 49>
+  struct ErrorDeclare final : public zs::EnumDeclare<Error, 50>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -115,12 +116,13 @@ struct ErrorTypes
         {Error::Syntax, "syntax"},
         {Error::OutputFailure, "output-failure"},
         {Error::ExplicitLeaseCannotReceiveLast, "explicit-lease-cannot-receive-last"},
-        {Error::ExplicitCopyCannotReceiveMove, "explicit-copy-cannot-receive-move"}
+        {Error::ExplicitCopyCannotReceiveMove, "explicit-copy-cannot-receive-move"},
+        {Error::KeywordAliasAlreadyDefined, "keyword-alias-already-defined"}
         } };
     }
   };
 
-  struct ErrorHumanReadableDeclare final : public zs::EnumDeclare<Error, 49>
+  struct ErrorHumanReadableDeclare final : public zs::EnumDeclare<Error, 50>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -134,11 +136,11 @@ struct ErrorTypes
         {Error::ImportedModuleFailure, "imported-module-failure"},
         {Error::SourceNotFound, "a source file ($file$) was requested to be parsed but it cannot be located"},
         {Error::AssetNotFound, "an asset file ($file$) was requested to be copied but it cannot be located"},
-        {Error::WildCharacterMismatch, "wild-character-mismatch"},
+        {Error::WildCharacterMismatch, "a wild character pattern was used in an incorrect way ($wild$)"},
         {Error::FinalFunctionPointsToNothing, "final-function-points-to-nothing"},
         {Error::DereferencePointerToNothing, "dereference-pointer-to-nothing"},
-        {Error::TokenExpected, "token-expected"},
-        {Error::TokenUnexpected, "token-unexpected"},
+        {Error::TokenExpected, "a specific token was expected ($token$)"},
+        {Error::TokenUnexpected, "a token was encountered that was not expected"},
         {Error::AsConversionNotCompatible, "as-conversion-not-compatible"},
         {Error::SoaAosIncompatible, "soa-aos-incompatible"},
         {Error::ConstantOverflow, "constant-overflow"},
@@ -173,7 +175,8 @@ struct ErrorTypes
         {Error::Syntax, "a syntax error was found"},
         {Error::OutputFailure, "an attempt to generate output or copy an asset to the output ($file$) failed"},
         {Error::ExplicitLeaseCannotReceiveLast, "explicit-lease-cannot-receive-last"},
-        {Error::ExplicitCopyCannotReceiveMove, "explicit-copy-cannot-receive-move"}
+        {Error::ExplicitCopyCannotReceiveMove, "explicit-copy-cannot-receive-move"},
+        {Error::KeywordAliasAlreadyDefined, "a keyword alias has already been defined ($alias$)"}
       } };
     }
   };

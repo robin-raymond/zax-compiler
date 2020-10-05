@@ -21,9 +21,11 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Alias.cpp" />
     <ClCompile Include="..\..\..\src\Context.cpp" />
+    <ClCompile Include="..\..\..\src\EntryCommon.cpp" />
     <ClCompile Include="..\..\..\src\FunctionType.cpp" />
     <ClCompile Include="..\..\..\src\Parser.cpp" />
     <ClCompile Include="..\..\..\src\CompilerState.cpp" />
+    <ClCompile Include="..\..\..\src\Parser_Alias.cpp" />
     <ClCompile Include="..\..\..\src\Parser_Directives.cpp" />
     <ClCompile Include="..\..\..\src\helpers.cpp" />
     <ClCompile Include="..\..\..\src\OperatorLut.cpp" />
@@ -33,16 +35,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\TemplateArguments.cpp" />
     <ClCompile Include="..\..\..\src\Token.cpp" />
     <ClCompile Include="..\..\..\src\Tokenizer.cpp" />
     <ClCompile Include="..\..\..\src\TokenList.cpp" />
     <ClCompile Include="..\..\..\src\CompilerException.cpp" />
     <ClCompile Include="..\..\..\src\Type.cpp" />
-    <ClCompile Include="..\..\..\src\TypeCommon.cpp" />
     <ClCompile Include="..\..\..\src\Union.cpp" />
     <ClCompile Include="..\..\..\src\Variable.cpp" />
     <ClCompile Include="..\..\..\src\zax.cpp" />
     <ClCompile Include="..\..\..\test\test_common.cpp" />
+    <ClCompile Include="..\..\..\test\test_ParserAlias.cpp" />
     <ClCompile Include="..\..\..\test\test_ParserLineDirectives.cpp" />
     <ClCompile Include="..\..\..\test\test_helpers.cpp" />
     <ClCompile Include="..\..\..\test\test_OperatorLut.cpp" />
@@ -51,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Alias.h" />
+    <ClInclude Include="..\..\..\src\EntryCommon.h" />
     <ClInclude Include="..\..\..\src\FunctionType.h" />
     <ClInclude Include="..\..\..\src\Parser.h" />
     <ClInclude Include="..\..\..\src\CompilerException.h" />
@@ -68,11 +72,11 @@
     <ClInclude Include="..\..\..\src\ParserTypes.h" />
     <ClInclude Include="..\..\..\src\pch.h" />
     <ClInclude Include="..\..\..\src\Source.h" />
+    <ClInclude Include="..\..\..\src\TemplateArguments.h" />
     <ClInclude Include="..\..\..\src\Token.h" />
     <ClInclude Include="..\..\..\src\Tokenizer.h" />
     <ClInclude Include="..\..\..\src\TokenList.h" />
     <ClInclude Include="..\..\..\src\Type.h" />
-    <ClInclude Include="..\..\..\src\TypeCommon.h" />
     <ClInclude Include="..\..\..\src\types.h" />
     <ClInclude Include="..\..\..\src\Union.h" />
     <ClInclude Include="..\..\..\src\Variable.h" />

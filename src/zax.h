@@ -15,6 +15,7 @@
 #include "ParserTypes.h"
 #include "Parser.h"
 #include "Source.h"
+#include "TemplateArguments.h"
 #include "Token.h"
 #include "Tokenizer.h"
 #include "TokenList.h"

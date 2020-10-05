@@ -99,6 +99,7 @@ int runAllTests() noexcept
     testTokenList();
     testTokenizer();
     testParserLineDirectives();
+    testParserAlias();
   }
   catch (...) {
     std::cout << "ERROR: uncaught exception thrown!\n";

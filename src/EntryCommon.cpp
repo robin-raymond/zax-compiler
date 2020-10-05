@@ -1,13 +1,13 @@
 
 #include "pch.h"
-#include "TypeCommon.h"
+#include "EntryCommon.h"
 #include "Context.h"
 
 using namespace zax;
 
 
 //-----------------------------------------------------------------------------
-Context* TypeCommon::context() noexcept
+Context* EntryCommon::context() noexcept
 {
   if (!context_)
     return {};
@@ -16,7 +16,7 @@ Context* TypeCommon::context() noexcept
 }
 
 //-----------------------------------------------------------------------------
-const Context* TypeCommon::context() const noexcept
+const Context* EntryCommon::context() const noexcept
 {
   if (!context_)
     return {};
@@ -25,7 +25,7 @@ const Context* TypeCommon::context() const noexcept
 }
 
 //-----------------------------------------------------------------------------
-ContextPtr TypeCommon::contextPtr() noexcept
+ContextPtr EntryCommon::contextPtr() noexcept
 {
   if (!context_)
     return {};
@@ -34,7 +34,7 @@ ContextPtr TypeCommon::contextPtr() noexcept
 }
 
 //-----------------------------------------------------------------------------
-const ContextConstPtr TypeCommon::contextPtr() const noexcept
+const ContextConstPtr EntryCommon::contextPtr() const noexcept
 {
   if (!context_)
     return {};

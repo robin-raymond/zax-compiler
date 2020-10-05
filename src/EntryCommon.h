@@ -10,13 +10,13 @@ namespace zax
 {
 
 //-----------------------------------------------------------------------------
-struct TypeCommonTypes
+struct EntryCommonTypes
 {
   using Resolve = ParserDirectiveTypes::Resolve;
 };
 
 //-----------------------------------------------------------------------------
-struct TypeCommon : public TypeCommonTypes
+struct EntryCommon : public EntryCommonTypes
 {
   const Puid id_{ puid() };
 

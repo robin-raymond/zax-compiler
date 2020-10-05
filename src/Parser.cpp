@@ -96,6 +96,8 @@ void Parser::process(Context& context) noexcept
     }
     if (consumeLineParserDirective(context))
       continue;
+    if (consumeAlias(context))
+      continue;
   }
 }
 
@@ -240,6 +242,18 @@ Tokenizer::iterator Parser::consumeAfter(Tokenizer::iterator  iter) noexcept
 }
 
 //-----------------------------------------------------------------------------
+Tokenizer::iterator Parser::consumeTo(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator  iter) noexcept
+{
+  return consumeTo(skipUntil(std::move(until), iter));
+}
+
+//-----------------------------------------------------------------------------
+Tokenizer::iterator Parser::consumeAfter(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator  iter) noexcept
+{
+  return consumeAfter(skipUntil(std::move(until), iter));
+}
+
+//-----------------------------------------------------------------------------
 TokenConstPtr Parser::validOrLastValid(const TokenConstPtr& token, Tokenizer& tokenizer) const noexcept
 {
   if (token)
@@ -285,7 +299,7 @@ std::optional<ParserTypes::QuoteResult> Parser::parseQuote(Tokenizer::iterator i
 }
 
 //-----------------------------------------------------------------------------
-std::optional<ParserTypes::NumberResult> Parser::parseSimpleNumber(Tokenizer::iterator iter) noexcept
+std::optional<ParserTypes::NumberResult> Parser::parseSimpleNumber(const Context& context, Tokenizer::iterator iter) noexcept
 {
   if (iter.isEnd())
     return {};
@@ -293,9 +307,9 @@ std::optional<ParserTypes::NumberResult> Parser::parseSimpleNumber(Tokenizer::it
   const OperatorLut& lut{ *iter.list().operatorLut_ };
 
   String prefix;
-  if (isOperatorOrAlternative(lut, *iter, Operator::PlusPreUnary))
+  if (isOperatorOrAlternative(context, lut, *iter, Operator::PlusPreUnary))
     prefix = "+"sv;
-  if (isOperatorOrAlternative(lut, *iter, Operator::MinusPreUnary))
+  if (isOperatorOrAlternative(context, lut, *iter, Operator::MinusPreUnary))
     prefix = "-"sv;
 
   if (!prefix.empty())
@@ -314,31 +328,41 @@ std::optional<ParserTypes::NumberResult> Parser::parseSimpleNumber(Tokenizer::it
 }
 
 //-----------------------------------------------------------------------------
-bool Parser::isOperator(const TokenConstPtr& token, Operator oper) noexcept
+std::optional<TokenTypes::Operator> Parser::extractOperator(const Context& context, const TokenConstPtr& token) noexcept
 {
   if (!token)
-    return false;
-  if (TokenType::Operator != token->type_)
-    return false;
-  return oper == token->operator_;
+    return {};
+  context.aliasLookup(token);
+  return token->lookupOperator();
 }
 
 //-----------------------------------------------------------------------------
-bool Parser::isOperatorOrAlternative(const TokenConstPtr& token, Operator oper) noexcept
+bool Parser::isOperator(const Context& context, const TokenConstPtr& token, Operator oper) noexcept
+{
+  return isOperatorOrAlternative(context, *context.parser().operatorLut_, token, oper);
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::isOperatorOrAlternative(const Context& context, const TokenConstPtr& token, Operator oper) noexcept
 {
   assert(operatorLut_);
-  return isOperatorOrAlternative(*operatorLut_, token, oper);
+  return isOperatorOrAlternative(context, *operatorLut_, token, oper);
 }
 
 //-----------------------------------------------------------------------------
-bool Parser::isOperatorOrAlternative(const OperatorLut& lut, const TokenConstPtr& token, Operator oper) noexcept
+bool Parser::isOperatorOrAlternative(const Context& context, const OperatorLut& lut, const TokenConstPtr& token, Operator oper) noexcept
 {
   if (!token)
     return false;
-  if (TokenType::Operator != token->type_)
+
+  context.aliasLookup(token);
+  auto _operator{ token->lookupOperator() };
+  if (!_operator)
     return false;
-  if (oper == token->operator_)
+
+  if (oper == *_operator)
     return true;
+
   auto& conflicts{ lut.lookupConflicts(oper) };
   return conflicts.end() != conflicts.find(token->operator_);
 }
@@ -384,11 +408,29 @@ bool Parser::isQuote(const TokenConstPtr& token) noexcept
 }
 
 //-----------------------------------------------------------------------------
-bool Parser::isCommaOrCloseDirective(const TokenConstPtr& token) noexcept
+bool Parser::isKeyword(const Context& context, const TokenConstPtr& token, Keyword keyword) noexcept
 {
-  if (isOperator(token, Operator::Comma))
+  auto compareKeyword{ Parser::extractKeyword(context, token) };
+  if (!compareKeyword)
+    return false;
+  return keyword == *compareKeyword;
+}
+
+//-----------------------------------------------------------------------------
+optional<ParserTypes::Keyword> Parser::extractKeyword(const Context& context, const TokenConstPtr& token) noexcept
+{
+  if (!token)
+    return {};
+  context.aliasLookup(token);
+  return token->lookupKeyword();
+}
+
+//-----------------------------------------------------------------------------
+bool Parser::isCommaOrCloseDirective(const Context& context, const TokenConstPtr& token) noexcept
+{
+  if (isOperator(context, token, Operator::Comma))
     return true;
-  if (isOperator(token, Operator::DirectiveClose))
+  if (isOperator(context, token, Operator::DirectiveClose))
     return true;
   return false;
 }
@@ -402,10 +444,18 @@ bool Parser::isUnknownExtension(const StringView name) noexcept
 }
 
 //-----------------------------------------------------------------------------
-std::function<bool(const TokenConstPtr& token)> Parser::isOperatorFunc(Operator oper) noexcept
+std::function<bool(const TokenConstPtr& token)> Parser::isSeparatorFunc() noexcept
 {
-  return [oper](const TokenConstPtr& token) noexcept -> bool {
-    return isOperator(token, oper);
+  return [](const TokenConstPtr& token) noexcept -> bool {
+    return isSeparator(token);
+  };
+}
+
+//-----------------------------------------------------------------------------
+std::function<bool(const TokenConstPtr& token)> Parser::isOperatorFunc(const Context& context, Operator oper) noexcept
+{
+  return [&context, oper](const TokenConstPtr& token) noexcept -> bool {
+    return isOperator(context, token, oper);
   };
 }
 

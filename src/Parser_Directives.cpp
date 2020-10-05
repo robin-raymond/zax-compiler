@@ -18,7 +18,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
   if (iter.isEnd())
     return {};
 
-  if (!isOperator(*iter, Operator::DirectiveOpen))
+  if (!isOperator(context, *iter, Operator::DirectiveOpen))
     return {};
 
   const OperatorLut& lut{ *iter.list().operatorLut_ };
@@ -34,11 +34,11 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
   result.openIter_ = iter;
   ++iter;
 
-  auto skipToCommaOrClose{ [](Tokenizer::iterator iter) noexcept -> Tokenizer::iterator {
+  auto skipToCommaOrClose{ [&context](Tokenizer::iterator iter) noexcept -> Tokenizer::iterator {
     while (!iter.isEnd()) {
       if (isSeparator(*iter))
         break;
-      if (isCommaOrCloseDirective(*iter))
+      if (isCommaOrCloseDirective(context, *iter))
         break;
       ++iter;
     }
@@ -50,9 +50,9 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
     bool primary{};
     if (isSeparator(*iter))
       break;
-    if (isOperator(*iter, Operator::DirectiveClose))
+    if (isOperator(context, *iter, Operator::DirectiveClose))
       break;
-    if (isOperator(*iter, Operator::Comma)) {
+    if (isOperator(context, *iter, Operator::Comma)) {
       if (lastWasComma)
         break;
       if (!result.literalIter_)
@@ -63,7 +63,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
     }
     lastWasComma = false;
 
-    auto literal{ parseDirectiveLiteral(iter) };
+    auto literal{ parseDirectiveLiteral(context, iter) };
     if (!literal)
       break;
 
@@ -83,8 +83,8 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
       continue;
     }
 
-    if (!isOperator(*iter, Operator::Assign)) {
-      if (!isCommaOrCloseDirective(*iter))
+    if (!isOperator(context, *iter, Operator::Assign)) {
+      if (!isCommaOrCloseDirective(context, *iter))
         break;
 
       bool check{ functions.noValueFunc_ && functions.noValueFunc_(primary, literal->literalIter_, literal->name_) };
@@ -102,14 +102,14 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 
     if (isSeparator(*iter))
       break;
-    if (isCommaOrCloseDirective(*iter)) {
+    if (isCommaOrCloseDirective(context, *iter)) {
       forceSyntax = true;
       break;
     }
 
     bool foundLiteral{};
-    if (auto assigned{ parseDirectiveLiteral(iter) }; assigned) {
-      if (isCommaOrCloseDirective(*assigned->afterIter_)) {
+    if (auto assigned{ parseDirectiveLiteral(context, iter) }; assigned) {
+      if (isCommaOrCloseDirective(context, *assigned->afterIter_)) {
         foundLiteral = true;
 
         auto check{ functions.literalValueFunc_ && functions.literalValueFunc_(primary, literal->literalIter_, literal->name_, assigned->name_) };
@@ -125,7 +125,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 
     if (!foundLiteral) {
       if (auto assigned{ parseQuote(iter) }; assigned) {
-        if (isCommaOrCloseDirective(*assigned->afterIter_)) {
+        if (isCommaOrCloseDirective(context, *assigned->afterIter_)) {
           iter = assigned->afterIter_;
           auto check{ functions.quoteValueFunc_ && functions.quoteValueFunc_(primary, literal->literalIter_, literal->name_, assigned->quote_) };
           if ((!check) && (!isUnknownExtension(literal->name_))) {
@@ -137,8 +137,8 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
         }
       }
 
-      if (auto assigned{ parseSimpleNumber(iter) }; assigned) {
-        if (isCommaOrCloseDirective(*assigned->afterIter_)) {
+      if (auto assigned{ parseSimpleNumber(context, iter) }; assigned) {
+        if (isCommaOrCloseDirective(context, *assigned->afterIter_)) {
           iter = assigned->afterIter_;
           auto check{ functions.numberValueFunc_ && functions.numberValueFunc_(primary, literal->literalIter_, literal->name_, assigned->number_) };
           if ((!check) && (!isUnknownExtension(literal->name_))) {
@@ -184,7 +184,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
   }
 
   if (understood) {
-    if ((!isOperator(*iter, Operator::DirectiveClose)) || forceSyntax) {
+    if ((!isOperator(context, *iter, Operator::DirectiveClose)) || forceSyntax) {
       if (!syntax) {
         out(Error::Syntax, pickValid(validOrLastValid(*iter, iter), *result.literalIter_, *result.openIter_));
         syntax = true;
@@ -195,7 +195,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
   while (!iter.isEnd()) {
     if (isSeparator(*iter))
       break;
-    if (isOperator(*iter, Operator::DirectiveClose)) {
+    if (isOperator(context, *iter, Operator::DirectiveClose)) {
       ++iter;
       break;
     }
@@ -210,7 +210,7 @@ std::optional<Parser::DirectiveResult> Parser::parseDirective(
 }
 
 //-----------------------------------------------------------------------------
-std::optional<ParserDirectiveTypes::DirectiveLiteralResult> Parser::parseDirectiveLiteral(Tokenizer::iterator iter) noexcept
+std::optional<ParserDirectiveTypes::DirectiveLiteralResult> Parser::parseDirectiveLiteral(const Context& context, Tokenizer::iterator iter) noexcept
 {
   if (iter.isEnd())
     return {};
@@ -228,7 +228,7 @@ std::optional<ParserDirectiveTypes::DirectiveLiteralResult> Parser::parseDirecti
   bool lastWasDash{};
   while (true) {
     ++iter;
-    if (isOperatorOrAlternative(lut, *iter, Operator::MinusPreUnary)) {
+    if (isOperatorOrAlternative(context, lut, *iter, Operator::MinusPreUnary)) {
       if (lastWasDash)
         break;
       lastWasDash = true;
@@ -251,10 +251,10 @@ bool Parser::consumeLineParserDirective(Context& context) noexcept
 {
   auto iter{ context->begin() };
 
-  if (!isOperator(*iter, Operator::DirectiveOpen))
+  if (!isOperator(context, *iter, Operator::DirectiveOpen))
     return false;
 
-  auto primaryLiteral{ parseDirectiveLiteral(iter + 1) };
+  auto primaryLiteral{ parseDirectiveLiteral(context, iter + 1) };
   if (!primaryLiteral) {
     ParseDirectiveFunctions nothing;
     nothing.legalName_ = [](bool, StringView) noexcept -> bool { return true; };
@@ -275,12 +275,12 @@ bool Parser::consumeLineParserDirective(Context& context) noexcept
     return consumeTabStopDirective(context, iter);
 
   if ("file"sv == primaryLiteral->name_) {
-    if (!isOperatorOrAlternative(*(primaryLiteral->afterIter_), Operator::Assign))
+    if (!isOperatorOrAlternative(context, *(primaryLiteral->afterIter_), Operator::Assign))
       return false;
     return consumeFileAssignDirective(context, iter);
   }
   if ("line"sv == primaryLiteral->name_) {
-    if (!isOperatorOrAlternative(*(primaryLiteral->afterIter_), Operator::Assign))
+    if (!isOperatorOrAlternative(context, *(primaryLiteral->afterIter_), Operator::Assign))
       return false;
     return consumeLineAssignDirective(context, iter);
   }
@@ -1524,7 +1524,7 @@ void Parser::handleAsset(Context& context, SourceAssetDirective& asset) noexcept
       for (auto& match : located.foundMatches_) {
         auto pos{ replacingStr.find_first_of("?*"sv) };
         if (String::npos == pos) {
-          out(Error::OutputFailure, asset.token_, StringMap{ { "$file$", replacingStr } });
+          out(Error::WildCharacterMismatch, asset.token_, StringMap{ { "$wild$", replacingStr } });
           failure = true;
           break;
         }

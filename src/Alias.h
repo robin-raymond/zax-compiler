@@ -4,6 +4,8 @@
 #include "types.h"
 #include "helpers.h"
 
+#include "EntryCommon.h"
+
 #include "Type.h"
 
 namespace zax
@@ -46,13 +48,9 @@ struct AliasTypes
 };
 
 //-----------------------------------------------------------------------------
-struct Alias : public AliasTypes
+struct Alias : public EntryCommon,
+               public AliasTypes
 {
-  const Puid id_{ puid() };
-
-  String name_;
-
-  TokenConstPtr location_;
 
   std::optional<bool> optional_{};
   std::optional<bool> mutable_{};
@@ -79,6 +77,8 @@ struct Alias : public AliasTypes
   TypePtr type_;
   FunctionTypePtr functionType_;
   UnionPtr union_;
+
+  TemplateArgumentsPtr templateArguments_;
 };
 
 } // namespace zax

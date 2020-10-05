@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#include "TypeCommon.h"
+#include "EntryCommon.h"
 
 namespace zax
 {
@@ -14,11 +14,15 @@ struct TypeTypes
 };
 
 //-----------------------------------------------------------------------------
-struct Type : public TypeCommon,
+struct Type : public EntryCommon,
               public TypeTypes
 {
-  String extensionOf_;
-  TypePtr extention_;
+  struct Partial
+  {
+    String name_;
+    TypePtr type_;
+  };
+  std::optional<Partial> partial_;
 
   struct Flag
   {
@@ -28,6 +32,8 @@ struct Type : public TypeCommon,
   Flag mutable_{ .enabled_ = true };
   Flag immutable_{ .enabled_ = true };
   bool managed_{};
+
+  TemplateArgumentsPtr templateArguments_;
 };
 
 } // namespace zax

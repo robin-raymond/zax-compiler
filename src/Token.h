@@ -140,6 +140,7 @@ struct TokenTypes
     ArrayValueInitializeClose,
     DirectiveOpen,
     DirectiveClose,
+    Discard,
     Self,
     Context,
     Constructor,
@@ -147,7 +148,7 @@ struct TokenTypes
   };
 
   
-  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 103>
+  struct OperatorDeclare final : public zs::EnumDeclare<Operator, 104>
   {
     constexpr const Entries operator()() const noexcept
     {
@@ -251,6 +252,7 @@ struct TokenTypes
         { Operator::ArrayValueInitializeClose, "}]" },
         { Operator::DirectiveOpen, "[[" },
         { Operator::DirectiveClose, "]]" },
+        { Operator::Discard, "#" },
         { Operator::Self, "_" },
         { Operator::Context, "___" },
         { Operator::Constructor, "+++" },
@@ -412,7 +414,7 @@ struct Token : public TokenTypes
   bool forcedSeparator_{};
 
   Operator operator_{};
-  Keyword keyword_{};
+  std::optional<Keyword> keyword_{};
 
   StringView originalToken_;
   StringView token_;
@@ -422,6 +424,15 @@ struct Token : public TokenTypes
 
   CompileStateConstPtr compileState_;
   TokenPtr comment_;
+
+  mutable bool aliasSearched_{};
+  mutable TokenConstPtr alias_;
+
+  std::optional<Operator> lookupOperator() const noexcept;
+  static std::optional<Operator> lookupOperator(const TokenConstPtr& token) noexcept { if (!token) return {}; return token->lookupOperator(); }
+
+  std::optional<Keyword> lookupKeyword() const noexcept;
+  static std::optional<Keyword> lookupKeyword(const TokenConstPtr& token) noexcept { if (!token) return {}; return token->lookupKeyword(); }
 };
 
 } // namespace zax

@@ -1634,7 +1634,6 @@ struct TokenizerInstance
     );
     expect(zax::ErrorTypes::Error::MissingEndOfQuote, 2, 4);
     expect(zax::ErrorTypes::Error::Syntax, 3, 4);
-    expect(zax::ErrorTypes::Error::Syntax, 3, 6);
     auto iter{ std::begin(get()) };
     auto iterBogus{ std::begin(get()) };
     TEST(iter == iterBogus);
@@ -1716,7 +1715,16 @@ struct TokenizerInstance
     {
       ++iter;
       auto token{ *iter };
-      validate(token, 3, 14-8+1);
+      validate(token, 3, 13 - 8 + 1);
+      TEST(token->type_ == zax::Token::Type::Operator);
+      TEST(token->operator_ == zax::Token::Operator::Discard);
+      TEST(token->originalToken_ == "#");
+      TEST(token->token_ == "#");
+    }
+    {
+      ++iter;
+      auto token{ *iter };
+      validate(token, 3, 14 - 8 + 1);
       TEST(token->type_ == zax::Token::Type::Operator);
       TEST(token->operator_ == zax::Token::Operator::Modulus);
       TEST(token->originalToken_ == "%");

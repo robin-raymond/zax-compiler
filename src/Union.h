@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#include "TypeCommon.h"
+#include "EntryCommon.h"
 
 namespace zax
 {
@@ -14,7 +14,7 @@ struct UnionTypes
 };
 
 //-----------------------------------------------------------------------------
-struct Union : public TypeCommon,
+struct Union : public EntryCommon,
                public UnionTypes
 {
 };

@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "Context.h"
+#include "Parser.h"
+#include "OperatorLut.h"
 
 using namespace zax;
 
@@ -64,4 +66,28 @@ CompileStatePtr Context::state() noexcept
 CompileStateConstPtr Context::state() const noexcept
 {
   return const_cast<Context*>(this)->state();
+}
+
+//-----------------------------------------------------------------------------
+void Context::aliasLookup(const Token& token) const noexcept
+{
+  if (token.aliasSearched_)
+    return;
+  token.aliasSearched_ = true;
+
+  if (TokenTypes::Type::Literal != token.type_)
+    return;
+
+  String literal{ token.token_ };
+
+  for (const Context* current{ this }; current; current = current->parent()) {
+    if (auto found{ current->aliasing_.keywords_.find(literal) }; found != current->aliasing_.keywords_.end()) {
+      token.alias_ = found->second;
+      break;
+    }
+    if (auto found{ current->aliasing_.operators_.find(literal) }; found != current->aliasing_.operators_.end()) {
+      token.alias_ = found->second;
+      break;
+    }
+  }
 }

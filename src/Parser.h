@@ -49,7 +49,7 @@ struct Parser : public ParserTypes,
     Context& context,
     Tokenizer::iterator iter,
     ParseDirectiveFunctions& functions) noexcept;
-  [[nodiscard]] static std::optional<DirectiveLiteralResult> parseDirectiveLiteral(Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] static std::optional<DirectiveLiteralResult> parseDirectiveLiteral(const Context& context, Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] bool consumeLineParserDirective(Context& context) noexcept;
   [[nodiscard]] bool consumeAssetOrSourceDirective(Context& context, Tokenizer::iterator iter, bool isSource) noexcept;
@@ -65,8 +65,11 @@ struct Parser : public ParserTypes,
   [[nodiscard]] bool consumeTypesDirective(Context& context, Tokenizer::iterator iter) noexcept;
   [[nodiscard]] bool consumeFunctionsDirective(Context& context, Tokenizer::iterator iter) noexcept;
 
+  [[nodiscard]] bool consumeAlias(Context& context) noexcept;
+  [[nodiscard]] bool consumeKeywordAlias(Context& context, Tokenizer::iterator iter) noexcept;
+
   [[nodiscard]] static std::optional<QuoteResult> parseQuote(Tokenizer::iterator iter) noexcept;
-  [[nodiscard]] static std::optional<NumberResult> parseSimpleNumber(Tokenizer::iterator iter) noexcept;
+  [[nodiscard]] static std::optional<NumberResult> parseSimpleNumber(const Context& context, Tokenizer::iterator iter) noexcept;
 
   [[nodiscard]] static Tokenizer::iterator skipUntil(Tokenizer& tokenizer, std::function<bool(const TokenPtr&)>&& until) noexcept;
   [[nodiscard]] static Tokenizer::iterator skipUntil(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator iter) noexcept;
@@ -79,6 +82,9 @@ struct Parser : public ParserTypes,
   [[nodiscard]] Tokenizer::iterator consumeTo(Tokenizer::iterator  iter) noexcept;
   [[nodiscard]] Tokenizer::iterator consumeAfter(Tokenizer::iterator  iter) noexcept;
 
+  [[nodiscard]] Tokenizer::iterator consumeTo(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator  iter) noexcept;
+  [[nodiscard]] Tokenizer::iterator consumeAfter(std::function<bool(const TokenPtr&)>&& until, Tokenizer::iterator  iter) noexcept;
+
   [[nodiscard]] static TokenConstPtr pickValid(const TokenConstPtr& tokenPreferred, const TokenConstPtr& tokenBackup) noexcept { return tokenPreferred ? tokenPreferred : tokenBackup; }
   [[nodiscard]] static TokenConstPtr pickValid(const TokenConstPtr& tokenPreferred, const TokenConstPtr& tokenBackup1, const TokenConstPtr& tokenBackup2) noexcept { return pickValid(pickValid(tokenPreferred, tokenBackup1), tokenBackup2); }
   [[nodiscard]] TokenConstPtr validOrLastValid(const TokenConstPtr& token, Tokenizer& tokenizer) const noexcept;
@@ -89,19 +95,24 @@ struct Parser : public ParserTypes,
   void handleAsset(Context& context, SourceAssetDirective&) noexcept;
   void handleSource(Context& context, SourceAssetDirective&) noexcept;
 
-  [[nodiscard]] static bool isOperator(const TokenConstPtr& token, Operator oper) noexcept;
-  [[nodiscard]] bool isOperatorOrAlternative(const TokenConstPtr& token, Operator oper) noexcept;
-  [[nodiscard]] static bool isOperatorOrAlternative(const OperatorLut& lut, const TokenConstPtr& token, Operator oper) noexcept;
+  [[nodiscard]] static std::optional<Operator> extractOperator(const Context& context, const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isOperator(const Context& context, const TokenConstPtr& token, Operator oper) noexcept;
+  [[nodiscard]] bool isOperatorOrAlternative(const Context& context, const TokenConstPtr& token, Operator oper) noexcept;
+  [[nodiscard]] static bool isOperatorOrAlternative(const Context& context, const OperatorLut& lut, const TokenConstPtr& token, Operator oper) noexcept;
   [[nodiscard]] static bool isLiteral(const TokenConstPtr& token) noexcept;
   [[nodiscard]] static bool isLiteral(const TokenConstPtr& token, StringView value) noexcept;
   [[nodiscard]] static bool isNumber(const TokenConstPtr& token) noexcept;
   [[nodiscard]] static bool isSeparator(const TokenConstPtr& token) noexcept;
   [[nodiscard]] static bool isQuote(const TokenConstPtr& token) noexcept;
 
-  [[nodiscard]] static bool isCommaOrCloseDirective(const TokenConstPtr& token) noexcept;
+  [[nodiscard]] static bool isKeyword(const Context& context, const TokenConstPtr& token, Keyword keyword) noexcept;
+  [[nodiscard]] static optional<Keyword> extractKeyword(const Context& context, const TokenConstPtr& token) noexcept;
+
+  [[nodiscard]] static bool isCommaOrCloseDirective(const Context& context, const TokenConstPtr& token) noexcept;
   [[nodiscard]] static bool isUnknownExtension(const StringView name) noexcept;
 
-  [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isOperatorFunc(Operator oper) noexcept;
+  [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isSeparatorFunc() noexcept;
+  [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isOperatorFunc(const Context& context, Operator oper) noexcept;
   [[nodiscard]] std::function<bool(const TokenConstPtr& token)> isOperatorOrAlternativeFunc(Operator oper) noexcept;
   [[nodiscard]] static std::function<bool(const TokenConstPtr& token)> isOperatorOrAlternativeFunc(const OperatorLut& lut, Operator oper) noexcept;
 

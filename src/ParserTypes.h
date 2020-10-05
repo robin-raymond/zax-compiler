@@ -18,6 +18,7 @@ struct ParserTypes
   constexpr static StringView unknownPrefix{ "x-" };
 
   using Operator = TokenTypes::Operator;
+  using Keyword = TokenTypes::Keyword;
 
   using Error = ErrorTypes::Error;
   using Warning = WarningTypes::Warning;
